@@ -1,0 +1,23 @@
+
+set architecture i8086
+
+target remote localhost:1234
+set architecture i8086
+symbol-file result/boot_mbr.elf
+set disassembly-flavor intel
+set tdesc filename stuff/target32.xml
+
+display/x { $cs, $ds, $ss, $es, $gs, $fs }
+
+#layout asm
+layout src
+layout regs
+focus cmd
+
+#break *0x7c00
+#break *0xfee5
+#break *0x600
+break main
+break bootmgr_main_wrapper
+c
+del br 1

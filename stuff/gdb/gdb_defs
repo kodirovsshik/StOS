@@ -1,0 +1,18 @@
+
+define nskip
+	br *($eip+$arg0)
+	c
+	del br $bpnum
+end
+
+define nint
+	nskip 2	
+end
+
+define ncall16
+	nskip 3
+end
+
+
+#display {$eax,$ebx,$ecx,$edx,$esp,$ebp,$esi,$edi}
+#display/x {$eax,$ebx,$ecx,$edx,$esp,$ebp,$esi,$edi}
