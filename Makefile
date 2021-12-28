@@ -56,8 +56,9 @@ override QEMU32 := qemu-system-i386   $(QEMU32_COMMON_ARGS) $(QEMU_COMMON_ARGS)
 override QEMU64 := qemu-system-x86_64 $(QEMU64_COMMON_ARGS) $(QEMU_COMMON_ARGS)
 
 
+override _NASM := nasm -Wall -Wother -Werror -Wno-label-redef-late -Wno-gnu-elf-extensions -gdwarf
+override NASM = $(_NASM) -I$(<D)
 
-NASM := nasm -Wall -Wother -Werror -Wno-label-redef-late -Wno-gnu-elf-extensions -gdwarf
 
 ifeq ($(DEBUG),no)
 override DBG := -Os
@@ -65,8 +66,10 @@ else
 override DBG := -g
 endif
 
-override _CC_ARGS := $(CC_ARGS) -c -ffreestanding -mno-red-zone -Wall -Wextra -Werror $(DBG) -I$(LOCAL_PATH)/src/include
+override _CC_ARGS := $(CC_ARGS) -std=c++20 -c -ffreestanding -mno-red-zone -Wall -Wextra -Werror $(DBG)
 override _CXX_ARGS := $(CXX_ARGS) $(_CC_ARGS) -fno-rtti -fno-exceptions -std=c++20
+
+override CC_INCLUDE_BOOT := -I$(LOCAL_PATH)/src/boot/shared/include
 
 CC64 := x86_64-elf-gcc
 CC32 := i686-elf-gcc
@@ -78,6 +81,9 @@ CXX16 := $(CXX32) -m16
 
 CC := gcc
 CXX := g++
+
+override _CC := $(CC)
+override _CXX := $(CXX) -std=c++20
 
 override _CC16 := $(CC16) $(_CC_ARGS)
 override _CC32 := $(CC32) $(_CC_ARGS)
@@ -100,22 +106,53 @@ override GDB64 := $(GDB) $(_GDB_ARGS) $(GDB_ARGS) -x stuff/gdb/gdb_script64
 
 
 
-BOOTLOADER_OBJS :=
-BOOTLOADER_OBJS += temp/bootloader/main.cpp.elf16
-BOOTLOADER_OBJS += temp/bootloader/io.cpp.elf16
-BOOTLOADER_OBJS += temp/bootloader/disk.cpp.elf16
-BOOTLOADER_OBJS += temp/bootloader/bootloader.cpp.elf16
-BOOTLOADER_OBJS += temp/bootloader/entry.asm.elf32
-BOOTLOADER_OBJS += temp/bootloader/interrupt.asm.elf32
-BOOTLOADER_OBJS += temp/bootloader/io.asm.elf32
-BOOTLOADER_OBJS += temp/bootloader/aux.asm.elf32
+STOS_LOADER_MBR_OBJS :=
 
-BOOTLOADER_MBR_RAW := result/boot_mbr.img
-BOOTLOADER_MBR_ELF := result/boot_mbr.elf
+STOS_LOADER_MBR_OBJS += temp/boot/mbr/main.cpp.elf16
+STOS_LOADER_MBR_OBJS += temp/boot/mbr/bootloader.cpp.elf16
+STOS_LOADER_MBR_OBJS += temp/boot/mbr/memory.cpp.elf16
+
+STOS_LOADER_MBR_OBJS += temp/boot/mbr/entry.asm.elf32
+STOS_LOADER_MBR_OBJS += temp/boot/mbr/bootloader.asm.elf32
+
+STOS_LOADER_MBR_OBJS += temp/boot/shared/io.cpp.elf16
+STOS_LOADER_MBR_OBJS += temp/boot/shared/disk.cpp.elf16
+
+STOS_LOADER_MBR_OBJS += temp/boot/shared/interrupt.asm.elf32
+STOS_LOADER_MBR_OBJS += temp/boot/shared/io.asm.elf32
+STOS_LOADER_MBR_OBJS += temp/boot/shared/aux.asm.elf32
+
+STOS_LOADER_MBR_ELF := result/bootloader_mbr.elf
+STOS_LOADER_MBR_RAW := result/bootloader_mbr.img
 
 
 
-PARTITIONER := stuff/partitioner/a.out
+VBR_OBJS :=
+
+VBR_OBJS += temp/boot/vbr/entry.asm.elf32
+VBR_OBJS += temp/boot/vbr/core.asm.elf32
+
+VBR_OBJS += temp/boot/vbr/main.cpp.elf16
+VBR_OBJS += temp/boot/vbr/rh_boot.cpp.elf16
+VBR_OBJS += temp/boot/vbr/rh_get_boot_options.cpp.elf16
+VBR_OBJS += temp/boot/vbr/native_boot.cpp.elf16
+
+VBR_OBJS += temp/boot/shared/disk.cpp.elf16
+VBR_OBJS += temp/boot/shared/io.cpp.elf16
+
+VBR_OBJS += temp/boot/shared/io.asm.elf32
+VBR_OBJS += temp/boot/shared/aux.asm.elf32
+VBR_OBJS += temp/boot/shared/interrupt.asm.elf32
+
+VBR_ELF := result/vbr.elf
+VBR_RAW := result/vbr.img
+
+
+INIT_BUILD_DIRS := temp/init
+
+
+PARTITIONER_MBR := stuff/partitioner/mbr
+BURNER := stuff/burner/a
 
 
 
@@ -129,11 +166,11 @@ CREATE_OUTPUT_DIR = X="$@" ; mkdir -p $${X%/*}
 
 .PHONY: all clean bootloader loader rebuild host_boot host_boot_debug
 .PHONY: debug32_qemu debug64_qemu system_wipe system_burn_mbr
-.PHONY: run32 run32v run64 run64v
+.PHONY: run32 run32v run64 run64v todo build_init
 
 
 
-all: bootloader loader
+all: stos_loader_mbr vbr
 
 
 
@@ -141,11 +178,16 @@ rebuild: clean all
 
 
 
-bootloader: $(BOOTLOADER_MBR_RAW)
+todo:
+	grep -nRi todo ./src ./stuff
 
 
 
-loader:
+stos_loader_mbr: $(STOS_LOADER_MBR_RAW)
+
+
+
+vbr: $(VBR_RAW)
 
 
 
@@ -164,58 +206,68 @@ host_boot:
 
 
 
-$(BOOTLOADER_MBR_RAW): $(BOOTLOADER_OBJS)
-	$(CREATE_OUTPUT_DIR)
-	$(LINK32) -T src/link/bootmgr.ld $(BOOTLOADER_OBJS) -o $(BOOTLOADER_MBR_ELF)
-	$(OBJCOPY32) -O binary $(BOOTLOADER_MBR_ELF) $(BOOTLOADER_MBR_RAW)
-	ndisasm -o 0x400 $(BOOTLOADER_MBR_RAW) > result/bootloader_mbr_disasm
-	xxd $(BOOTLOADER_MBR_RAW) > result/bootloader_mbr_hexdump
+$(STOS_LOADER_MBR_RAW): $(STOS_LOADER_MBR_OBJS)
+	$(LINK32) -T src/link/bootmgr.ld $^ -o $(STOS_LOADER_MBR_ELF)
+	$(OBJCOPY32) -O binary $(STOS_LOADER_MBR_ELF) $@
+	ndisasm -o 0x400 $@ > $@.disasm
+	xxd $@ > $@.disasm
+
+$(VBR_RAW): $(VBR_OBJS)
+	$(LINK32) -T src/link/vbr.ld $^ -o $(VBR_ELF)
+	$(OBJCOPY32) -O binary $(VBR_ELF) $@
+	ndisasm -o 0x7C00 $@ > $@.disasm
+	xxd $@ > $@.disasm
 
 
 
 clean:
 	rm -rf temp/* result/*
-	mkdir -p temp/bootloader
+	mkdir -p temp/boot/mbr
 
 
 
 clean_wipe:
 	rm -rf system temp result
-	rm -f $(PARTITIONER)
+	rm -f $(PARTITIONER_MBR) $(BURNER)
 
 
 
-temp/%.asm.elf32: src/%.asm
-	$(CREATE_OUTPUT_DIR)
+$(INIT_BUILD_DIRS):
+	tree -dfi --noreport src | xargs -i mkdir -p "temp/{}"
+	mv temp/src/* temp
+	rm -r temp/src
+	mkdir result
+	touch $@
+
+
+
+temp/%.asm.elf32: src/%.asm $(INIT_BUILD_DIRS)
 	$(NASM) -f elf32 $< -o $@
 
-temp/%.asm.elf64: src/%.asm
-	$(CREATE_OUTPUT_DIR)
+temp/%.asm.elf64: src/%.asm $(INIT_BUILD_DIRS)
 	$(NASM) -f elf64 $< -o $@
 
-temp/%.c.elf16: src/%.c
-	$(CREATE_OUTPUT_DIR)
-	$(_CC16) $< -o $@
 
-temp/%.cpp.elf16: src/%.cpp
-	$(CREATE_OUTPUT_DIR)
-	$(_CXX16) $< -o $@
+temp/boot/%.c.elf16: src/boot/%.c $(INIT_BUILD_DIRS)
+	$(_CC16) $< -o $@ $(CC_INCLUDE_BOOT)
 
-temp/%.c.elf32: src/%.c
-	$(CREATE_OUTPUT_DIR)
-	$(_CC32) $< -o $@
+temp/boot/shared/disk.cpp.elf16: src/boot/shared/disk.cpp $(INIT_BUILD_DIRS)
+	$(_CC16) $< -o $@ $(CC_INCLUDE_BOOT) -include src/boot/shared/include/aux.h
 
-temp/%.cpp.elf32: src/%.cpp
-	$(CREATE_OUTPUT_DIR)
-	$(_CXX32) $< -o $@
+temp/boot/%.cpp.elf16: src/boot/%.cpp $(INIT_BUILD_DIRS)
+	$(_CXX16) $< -o $@ $(CC_INCLUDE_BOOT)
 
-temp/%.c.elf64: src/%.c
-	$(CREATE_OUTPUT_DIR)
-	$(_CC64) $< -o $@
+temp/boot/%.c.elf32: src/boot/%.c $(INIT_BUILD_DIRS)
+	$(_CC32) $< -o $@ $(CC_INCLUDE_BOOT)
 
-temp/%.cpp.elf64: src/%.cpp
-	$(CREATE_OUTPUT_DIR)
-	$(_CXX64) $< -o $@
+temp/boot/%.cpp.elf32: src/boot/%.cpp $(INIT_BUILD_DIRS)
+	$(_CXX32) $< -o $@ $(CC_INCLUDE_BOOT)
+
+temp/boot/%.c.elf64: src/boot/%.c $(INIT_BUILD_DIRS)
+	$(_CC64) $< -o $@ $(CC_INCLUDE_BOOT)
+
+temp/boot/%.cpp.elf64: src/boot/%.cpp $(INIT_BUILD_DIRS)
+	$(_CXX64) $< -o $@ $(CC_INCLUDE_BOOT)
 
 
 
@@ -259,10 +311,10 @@ system_wipe:
 
 
 
-stuff/%.out: stuff/%.cpp
-	$(CC) $< -o $@ -g
-stuff/%.out: stuff/%.c
-	$(CC) $< -o $@ -g
+$(PARTITIONER_MBR): $(PARTITIONER_MBR).cpp
+	$(_CXX) $< -o $@ -g $(CC_INCLUDE_BOOT)
+$(BURNER): $(BURNER).cpp
+	$(_CXX) $< -o $@ -g $(CC_INCLUDE_BOOT) src/boot/shared/disk.cpp -include string.h
 
 
 
@@ -273,6 +325,6 @@ system_reset_mbr: $(PARTITIONER)
 
 system_burn_mbr: all
 	mkdir -p system
-	dd bs=1 if=$(BOOTLOADER_MBR_RAW) of=$(SYSTEM_DRIVE1_FILE) conv=notrunc count=440 #Copy initial data upto the partition table
-	dd bs=1 if=$(BOOTLOADER_MBR_RAW) of=$(SYSTEM_DRIVE1_FILE) conv=notrunc seek=510 skip=510 count=2 #Copy MBR marker
-	dd bs=1 if=$(BOOTLOADER_MBR_RAW) of=$(SYSTEM_DRIVE1_FILE) conv=notrunc seek=512 skip=512 #Copy MBR second stage
+	dd bs=1 if=$(STOS_LOADER_MBR_RAW) of=$(SYSTEM_DRIVE1_FILE) conv=notrunc count=440 #Copy initial data upto the partition table
+	dd bs=1 if=$(STOS_LOADER_MBR_RAW) of=$(SYSTEM_DRIVE1_FILE) conv=notrunc seek=510 skip=510 count=2 #Copy MBR marker
+	dd bs=1 if=$(STOS_LOADER_MBR_RAW) of=$(SYSTEM_DRIVE1_FILE) conv=notrunc seek=512 skip=512 #Copy MBR second stage
