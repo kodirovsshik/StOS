@@ -94,7 +94,7 @@ make clean_wipe
 
 # Licensing
 
-This repository contains source code used to build and debug the software. All the code within this repository is distributed under the GNU General Public Licence v3. This however does not apply to the XML files in stuff/gdb folder as they are freely available on the internet
+StOS is a free sowftware, all the code within this repository is distributed under the GNU General Public Licence v3, except it does not apply to ./src/crc folder's contents or to the XML files in stuff/gdb as these are freely available on the internet
 
 See LICENSE for the full text of license and more information
 

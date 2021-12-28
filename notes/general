@@ -1,0 +1,3 @@
+
+What should be done:
+	Stop making 1579108536587482`91 changes at once and then try to split it across several "independent" commits
