@@ -1,0 +1,9 @@
+
+Memory management:
+
+v1:
+	"allocate" page blocks to cover all present memory pages
+	"allocate" freed pages table
+
+v2:
+	"allocate" free pages circle buffer

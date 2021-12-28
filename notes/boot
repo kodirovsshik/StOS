@@ -1,0 +1,359 @@
+
+
+
+
+Remade:
+	desc:
+		Bootloader stored in MBR
+		loader is stored both after the MBR and in compatible partitions
+
+		StOS VBR invocation:
+			DS:SI = mbr entry with
+				//.active = VBR drive
+				.start = low  4 bytes of VBA start
+				.count = high 4 bytes of VBA start
+			BX = ptr "StOSrequ"
+			DL = VBR drive
+			DH    = preserved from BIOS
+			ES:DI = preserved from BIOS
+			CX = ptr struct
+				word size
+				word req_type
+					STOS_REQ_GET_BOOT_OPTIONS
+						#return a list of StOS installations sorted by partitions
+					STOS_REQ_BOOT
+						#boot from a specified partition
+				word mbr_version
+				word req_data (probably a ptr)
+				dword free_memory_begin
+
+			on return:
+			EAX = return status
+			struct.req_data = response
+
+			services:
+			STOS_REQ_GET_BOOT_OPTIONS = 1
+				req_data = disk
+				return = ptr struct stos_boot_entry_t
+			
+			STOS_REQ_BOOT = 2
+				req_data = ptr struct stos_boot_req_data_t
+				return = error code (returns on fail)
+					read error
+					no StOS installation found
+					invalid disk
+					invalid partition
+					out of memory
+					CPUID error
+
+		VBR strat:
+
+			Memory map: (hex)
+				addr sz desc
+				0580 10 [DS:SI] backup
+				0590 04 [ES:DI] backup
+				0594 02 DX backup
+				0596 10 LBA packet
+				05A6 02 CX backup
+				05A8 08 invoke datetime
+				05A9 01 bool is_stos_req
+				
+			Backup everything needed
+			Get full invoke time/date
+			Load own code 0x7E00
+			cmpsb bx, "StOSrequ"
+			jne .native
+			je .req
+			
+		.req:
+			load 8-byte LBA from [DS:SI] backup
+			Issue an LBA read to 0x7C00
+			Test for valid request number
+			Call nth request handler
+			return
+			
+		.native:
+			setup SS:SP = 0x0000:0x7C00
+			load 4-byte LBA from [DS:SI] backup
+			Issue an LBA read to 0x7C00
+			Call generic boot handler?
+			
+
+
+			restore es, si, dx from globals
+			save StOSrequ = false
+			extract partition LBA, size and disk  from SI to global var
+			jmp to common boot handler (.boot_common)
+
+		.boot_common:
+			test CPU for necessary features
+			perform FS detection
+			use FS-dependend code
+				check FS integrity
+				locate the kernel
+				check for file integrity
+					hash?
+				save loader invoke time and disk number to local reserved area
+				
+			Go unreal mode
+			Enable A20
+			load the kernel into memory
+			Go protected mode
+			Setup identity paging
+			transfer control to the kernel, pass data:
+				loader invoke time
+				bios disk number
+
+		STOS_REQ_GET_BOOT_OPTIONS:
+			for every partition P in D:
+				Open P's filesystem F
+				In F find /stos/kernel.elf
+				Add P to list
+			return
+
+		STOS_REQ_BOOT:
+			Extract disk D and partition P number N
+			call common boot handler
+		
+
+		 MBR strat:
+			Load own code to 0x600
+			Create boot entries list L
+			Let S = drive with global VBA installed
+			Let Sv = version of global VBA on S = 0
+			For every disk or floppy D on the machine:
+				if present(StOS MBR) and present(StOS VBR):
+					if (D.MBR.ver > self.ver):
+						#transfer control to D.MBR
+						#or maybe not
+					if (D.VBR.ver > Sv):
+						S = D
+						Sv = S.ver
+						
+			For every disk or floppy D on the machine:
+				if present(StOS MBR):
+					#if D.MBR.ver > self.ver
+						#add D to L
+					if Sv != 0
+						Invoke S.VBR and ask for the set of StOS Installations on D
+						For all partitions P in D with a StOS installation, add D:P to L
+						
+				elif present(MBR):
+					add D to L
+
+				for every partition P in D:
+					if P is active and not present in L:
+						add D:P to L
+
+				
+notes:
+	✓ Do not tie to MBR only
+	✓ Learn more about microsoft extended partition
+	✓ Write partition iterator
+	✓ use stack = 0xFA00..0xFE00 if there is 64KiB of memory
+	✓ initialize heap top from asm code
+#	thoughts:
+	props:
+		scalable
+		system partition type-independend
+	cons:
+		a lot of code for different cases
+
+		
+
+
+
+
+
+
+
+Place VBR right after MBR
+
+	props:
+		scalable
+		system partition type-independend
+
+	cons:
+		in perspective, different boot scenario cases based on system partition will have to have been implemented
+		//I mean like yeah, of course it would get complicated, im developing a fucking OS
+
+	MBR metadata:
+		1AD: "StOSboot" //8 bytes
+		1B5: MBR version //2 bytes
+			MBR minor version, valid if major is valid
+			MBR major version, valid if != 0 && != 0xFF
+		1B7: size in sectors of MBR //1 byte
+		1B8: disk signature //6 bytes
+		1BE: (partition table)
+		1FE: 0xAA55 //MBR sign, 2 bytes
+
+	VBR metadata:
+		1AD: "StOSload" //8 bytes
+		1B5: VBR version //2 bytes
+			VBR minor version, valid if major is valid
+			VBR major version, valid if != 0 && != 0xFF
+		1B7: size in sectors of VBR //1 byte
+
+	MBR boot strategy:
+		For every hard drive and floppy disk in the system:
+		Check for a StOS bootloader
+		If not found:
+			Continue
+		If found:
+			A = size of bootloader in sectors
+			Load Ath sector (counting from 0)
+			Check for VBR signature to be present
+				If found, store StOS partitions bits into T
+			
+		For every partition P among all drives
+			Check if P is active
+				If so, create a native boot option, continue
+			Check if P is in T
+				If so, create a StOS boot option, continue
+			Skip P
+
+		If more than one partition found, ask for a to-be-booted-from partition P
+
+		MBR-to-VBR interface:
+			BX = ptr "StOSboot"
+			push StOS boot info structure:
+				word struct_size (struct valid if not zero)
+				word mbr_version (struct valid if not zero)
+				dword vbr_lba
+				dword partirion_lba
+				dword partirion_size_sectors
+				word free_memory_begin
+				byte disk
+				byte mbr_partition_type
+				word magic_ptr = "StOSboot"
+
+		If P has a native boot option:
+			DL = drive number
+			SI = MBR table entry
+			BP = SI
+			AX = BX = CX = DH = DI = 0
+			DS = ES = GS = FS = 0
+			jmp far 0x0000:0x7C00
+
+		If P has a StOS boot option:
+			call far 0x0000:0x7C00
+
+
+
+Create aux fat16 partition
+	props:
+		easy to implement
+		no special handling
+	cons:
+		wasting a sector
+
+
+
+Place vbr behind first partition
+	props:
+		same as vbr after mbr
+	cons:
+		inconvinient to work with
+		what if there is no partition
+
+
+
+
+
+
+VBR boot stragety:
+#16 bits, entry
+	memory map:
+		0x580 byte unused
+		0x581 byte is_from_stos
+		0x582 word old ds
+		0x584 word old si
+		0x586 oword LBA packet
+			+00 0x586 byte 16
+			+01 0x587 byte 0
+			+02 0x588 word VBR size - 1
+			+04 0x58A word offset = 0x0000
+			+06 0x58C word segment = 0x07E0
+			+08 0x58E qword LBA
+		0x596 oword DS:SI copy
+		0x5A6 free
+		
+	jmp over bpb (keep it anyways for safety)
+	save DS through AX to 0x582
+	save SI to 0x584
+	P = 0x586 = LBA packet //16 bytes
+	DS = 0
+	if [bx] == "StOS":
+		byte [0x581] = 1
+		P[8..11] = boot_info.partition_lba
+		DL = boot_info.disk
+	else:
+		byte [0x581] = 0
+		SS:SP = 0x0000:0x7C00
+		ES:SI = [0x582..0x585]
+		P[8..11] = [ES:SI + 8]
+		
+	SI = P (0x586 it is)
+	P[0..1] = 16
+	P[2..3] = VBR size in sectors - 1
+	P[4..5] = 0
+	P[6..7] = 0x7E00
+	P[12..15] = 0
+
+	int 13h,42h
+
+	On any fail:
+		if byte [0x501] == 0x69, return to mbr
+		else print error message and halt
+
+	Use The Ultimate CPU Detection Algorithm by Intel© to check for CPUID flags: lm, cmov, fpu (also but unnecessairly for SSE, AVX)
+
+#16 bit addressing, 32 bit registers
+	Collect usable memory map in the form
+		uint64_t begin
+		uint64_t size
+	
+	Store total memory size to qword [0x508]
+	(get it from bios somehow, if failed, use 512KiB)
+
+	If > 1MiB of memory found, try enabling A20 line:
+
+		check
+		
+		use int 15h
+		wait
+		check
+
+		N times:
+			use kb method
+			wait
+			check
+
+		use port EE/EF (read)
+		wait
+		check
+		
+		use port 92
+		wait
+		check
+
+	Zero out segments
+	Setup flat 4GB address space descriptors
+	Clear interrupts
+	Go 32-bit protected mode
+
+	32-bit disk read handler:
+		pushad
+		go real mode
+		sti
+		fill in lba packet with dst 0x1000:0x0000
+		int 13h,42h
+		rep movsd 0x1000:0x0000 to actual dst
+		cli
+		go back protected mode
+		popad
+		ret
+	
+	Locate the kernel file
+	Load the kernel by parts to 0x100000 (1 Mib)
+		Possibly switching back and forth between real and protected mode
