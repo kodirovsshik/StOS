@@ -17,7 +17,10 @@
 int main(int argc, char** argv)
 {
 	if (argc != 7)
+	{
+		fprintf(stderr, "Usage: %s drive N type first count active\n", argv[0]);
 		return ERR_ARGS_COUNT;
+	}
 
 	FILE* fd = fopen(argv[1], "rb+");
 	if (!fd)
@@ -27,8 +30,8 @@ int main(int argc, char** argv)
 	const size_t fsize = ftell(fd);
 
 	const size_t total_sectors = fsize / 512;
-	const size_t first_valid_sector = 2048;
-	const size_t last_valid_sector = total_sectors; //not inclusive
+	const size_t first_valid_sector = 1;
+	const size_t last_valid_sector = total_sectors - 1;
 
 	int num;
 	if (sscanf(argv[2], "%i", &num) != 1 || num < 1 || num > 4)
@@ -42,8 +45,8 @@ int main(int argc, char** argv)
 	if (sscanf(argv[4], "%lli", &pbegin) != 1 || pbegin < -1)
 		return ERR_ARG_EXTRACT_BEGIN;
 
-	long long pend;
-	if (sscanf(argv[5], "%lli", &pend) != 1 || pend < -1)
+	long long pcount, pend;
+	if (sscanf(argv[5], "%lli", &pcount) != 1 || pend < -1)
 		return ERR_ARG_EXTRACT_END;
 
 	int active;
@@ -51,12 +54,13 @@ int main(int argc, char** argv)
 		return ERR_ARG_EXTRACT_ACTIVE;
 
 
-	if (pend == -1)
-		pend = last_valid_sector;
-
 	if (pbegin == -1)
-		pbegin = first_valid_sector;
+		pbegin = 2048;
 
+	if (pcount == -1)
+		pcount = last_valid_sector + 1 - pbegin;
+
+	pend = pcount - 1 + pbegin;
 
 	if (type && first_valid_sector > last_valid_sector)
 		return ERR_DRIVE_SIZE;
@@ -86,19 +90,27 @@ int main(int argc, char** argv)
 		type = mbr[offset + 4];
 
 	mbr[offset++] = active;
-	mbr[offset++] = type ? 0xFE : 0;
-	mbr[offset++] = type ? 0xFF : 0;
-	mbr[offset++] = type ? 0xFF : 0;
-
+	if (type == 0xEE)
+	{
+		mbr[offset++] = 0;
+		mbr[offset++] = 0;
+		mbr[offset++] = 0;
+	}
+	else
+	{
+		mbr[offset++] = type ? 0xFE : 0;
+		mbr[offset++] = type ? 0xFF : 0;
+		mbr[offset++] = type ? 0xFF : 0;
+	}
 	mbr[offset++] = type;
 	mbr[offset++] = type ? 0xFE : 0;
 	mbr[offset++] = type ? 0xFF : 0;
 	mbr[offset++] = type ? 0xFF : 0;
 
 	*(uint32_t*)&mbr[offset + 0] = pbegin;
-	*(uint32_t*)&mbr[offset + 4] = pend - pbegin + 1;
+	*(uint32_t*)&mbr[offset + 4] = pcount;
 
-	*(uint16_t*)&mbr[0x510] = 0xAA55;
+	*(uint16_t*)&mbr[510] = 0xAA55;
 
 	fseek(fd, 0, SEEK_SET);
 	fwrite(mbr, 1, 512, fd);
