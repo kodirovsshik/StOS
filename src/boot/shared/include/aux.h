@@ -19,55 +19,25 @@
 
 
 
-#ifndef _BOOTLOADER_H_
-#define _BOOTLOADER_H_
+#ifndef _AUX_H_
+#define _AUX_H_
 
-#include <stdint.h>
 #include <stddef.h>
+#include "defs.h"
 
-#include "aux.h"
-#include "multiloader.h"
 
 
 _EXTERN_C_
 
+void* memset  (void* dst, int val, size_t count);
+void* memset32(void* dst, int val, size_t count);
+void* memcpy(void* dest, const void* src, size_t count);
+
+int strncmp(const char* s1, const char* s2, size_t max);
+int memcmp (const void* p1, const void* p2, size_t size);
+
 [[noreturn]]
 void halt();
-
-
-[[noreturn]]
-void __err(const char* what, const char* file, uint32_t line);
-#define _err(what) __err(what, __FILE__, __LINE__)
-
-
-[[noreturn]]
-void _mbr_return();
-
-[[noreturn]]
-void _mbr_transfer_control_flow(uintptr_t);
-
-int invoke_vbr(stos_request_header_t*, uint8_t vbr_disk, uint32_t vbr_lba);
-
-
-void memory_dump(const void*, size_t);
-
-
-void sleep(uint32_t milliseconds);
-void nanosleep(int64_t ns);
-
-
-void* malloc(size_t);
-void realloc(void*, size_t from, size_t to);
-void free(void* p, size_t);
-void* get_heap_top();
-
-
-extern unsigned const char __bootloader_begin;
-extern unsigned const char __bootloader_end;
-extern unsigned const char __bootloader_size;
-extern unsigned const char STACK_TOP;
-extern unsigned const char MBR_VERSION;
-
 
 _EXTERN_C_END_
 
@@ -80,5 +50,4 @@ consteval size_t countof(const T (&)[N])
 }
 
 
-
-#endif //!_BOOTLOADER_H_
+#endif //!_AUX_H_

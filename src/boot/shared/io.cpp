@@ -20,7 +20,7 @@
 
 
 #include "io.h"
-#include "bootloader.h"
+#include "aux.h"
 #include "interrupt.h"
 
 
@@ -76,9 +76,76 @@ void memory_dump(const void* _p, size_t n)
 	}
 }
 
+bool get32u(uint32_t* dst, uint32_t max)
+{
+	return get32(dst, max, 10);
+}
+bool get32(uint32_t* dst, uint32_t max, uint32_t digits)
+{
+	uint32_t x = 0;
+	short len = 0;
+
+	while (true)
+	{
+		uint32_t c = (uint32_t)getch() & 0xFF;
+		if (c == 0 || c == 4) //ctrl-break or ctrl-c
+			return false;
+
+		if (c == 13 || c == 10)
+		{
+			endl();
+			if (len)
+				*dst = x;
+			return len != 0;
+		}
+
+		if (c == 8)
+		{
+			if (len != 0)
+			{
+				x /= 10;
+				--len;
+				puts("\x08 \x08");
+			}
+			continue;
+		}
+
+		if (c < '0')
+			continue;
+
+		if (digits <= 10)
+		{
+			if (c - '0' >= digits)
+				continue;
+		}
+		else
+		{
+			if (c - '0' < 10 || (c >= 'a' && c < 'a' + digits) || (c >= 'A' && c < 'A' + digits))
+			{}
+			else continue;
+		}
+
+		uint32_t d;
+		if (c <= '9')
+			d = c - '0';
+		else if (c <= 'Z')
+			d = c - 'a';
+		else
+			d = c - 'A';
+
+		if (d > max || x > (max - d) / digits)
+			continue;
+
+		putc(::digits[d]);
+		x = x * digits + d;
+		++len;
+	}
+}
 
 
-uint8_t current_boot_drive;
+
+
+uint8_t current_boot_drive = 0xFF;
 
 uint8_t get_boot_drive()
 {
@@ -117,7 +184,7 @@ typedef struct
 #define LBA_COMMAND_READ 0x42
 #define LBA_COMMAND_WRITE 0x43
 
-uint8_t drive_lba_command(uint8_t disk, uint32_t lba, void* ptr, uint16_t num, uint8_t command)
+uint8_t drive_lba_command(uint8_t disk, uint64_t lba, void* ptr, uint16_t num, uint8_t command)
 {
 	lba_packet16_t packet;
 	packet.first = lba;
@@ -145,13 +212,13 @@ uint8_t drive_lba_command(uint8_t disk, uint32_t lba, void* ptr, uint16_t num, u
 	return 0;
 }
 
-uint8_t write_drive_lba(uint8_t disk, uint32_t lba, const void* ptr, uint16_t num)
+uint8_t write_drive_lba(uint8_t disk, uint64_t lba, const void* ptr, uint16_t num)
 {
 	return drive_lba_command(disk, lba, (void*)ptr, num, LBA_COMMAND_WRITE);
 }
-uint8_t read_drive_lba(uint8_t disk, uint32_t lba,        void* ptr, uint16_t num)
+uint8_t read_drive_lba(uint8_t disk, uint64_t lba, void* ptr, uint16_t num)
 {
-	return drive_lba_command(disk, lba, (void*)ptr, num, LBA_COMMAND_READ);
+	return drive_lba_command(disk, lba, ptr, num, LBA_COMMAND_READ);
 }
 
 void tabulate(int n)

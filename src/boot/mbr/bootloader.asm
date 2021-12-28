@@ -19,43 +19,55 @@
 
 
 
+global bootloader_main_wrapper
+global halt
+global _mbr_return
+global _mbr_transfer_control_flow
+global _sleep_ns_unchecked
+global _invoke_vbr_helper
+
 extern main
 extern current_boot_drive
 extern puts
 extern putc
-extern STACK_TOP
 
-
-global bootloader_main_wrapper
-global halt
-global memcpy
-global memset
-global strncmp
-global _mbr_return
-global _mbr_transfer_control_flow
-global _sleep_ns_unchecked
-global _invoke_vbr
 
 
 %define EOI 0x20
+
+
+
+
+
+;//SECTION .data
+
+;//sleep_finished:
+;//db 0
+
+
+
+
+
+SECTION .rodata
+
+msg_halted:
+db 10, "Execution halted", 0
+
+
+
 
 
 BITS 16
 SECTION .text
 
 
+
 bootloader_main_wrapper:
+	sti
 	;//mov dword [32], timer_handler
 
 	mov dx, word [0x502]
 	mov byte [current_boot_drive], dl
-
-	cli
-	xor ax, ax
-	mov ss, ax
-	mov bp, ax
-	mov sp, STACK_TOP
-	sti
 
 	call dword main
 	int 0x18
@@ -71,35 +83,41 @@ halt:
 
 
 
-;//int _invoke_vbr(stos_request_header_t*, const void*);
+;//return _invoke_vbr_helper(hdr, disk, &entry);
 ;//cdecl
-;//dword drive
-;//dword signature
-;//dword req data
-_invoke_vbr:
+_invoke_vbr_helper:
 	push ebp
-	mov bp, sp
-	push si
-	push di
-	push ebx
+	mov ebp, esp
+	pushad
 
-	mov ax, word [0x506]
-	mov es, ax
-	mov di, word [0x504]
 	xor si, si
-	mov cx, word [bp + 8]
-	mov bx, word [bp + 12]
+	mov ds, si
+	mov si, word [bp + 8]
+	mov bx, .msg
+	mov dl, byte [bp + 12]
 	mov dh, byte [0x503]
-	mov dl, byte [bp + 16]
+	mov di, word [0x506]
+	mov es, di
+	mov di, word [0x504]
+	mov ecx, dword [bp + 16]
 
-	call 0x7C00
+	call dword 0x7C00
 
-	pop ebx
-	pop di
-	pop si
-	pop bp
+	xor bx, bx
+	mov es, bx
+	mov ds, bx
+
+	mov dword [.tmp], eax
+	popad
+
+	mov eax, dword [.tmp]
+	pop ebp
 	retd
 
+.msg:
+db "StOSrequ", 0
+.tmp:
+dd 0
 
 
 %if 0
@@ -231,137 +249,3 @@ _mbr_transfer_control_flow:
 	xor ecx, ecx
 
 	jmp 0x0000:0x7C00
-
-
-
-;//cdecl
-;//dword size
-;//dword byte value
-;//dword ptr
-memset:
-	xor eax, eax
-	mov edx, eax
-	mov al, [esp + 8]
-	mov ecx, 0x01010101
-	mul ecx
-	mov [esp + 8], eax
-
-
-
-;//cdecl
-;//dword size
-;//dword byte value
-;//dword ptr
-memset32:
-	push edi
-
-	cld
-	mov di, word [esp + 8]
-	mov eax, dword [esp + 12]
-	mov cx, word [esp + 16]
-
-	mov dx, cx
-	shr cx, 4
-
-	rep stosd
-
-	test dx, dx
-	jz .ret
-
-	stosb
-	dec dx
-	jz .ret
-
-	shr eax, 8
-	stosb
-	dec dx
-	jz .ret
-
-	mov [di], ah
-.ret:
-	pop edi
-	mov eax, dword [esp + 4]
-	retd
-
-
-
-;//cdecl
-;//dword size
-;//dword src
-;//dword dst
-memcpy:
-	push esi
-	push edi
-
-	cld
-	mov esi, dword [esp + 16]
-	mov edi, dword [esp + 12]
-	mov ecx, dword [esp + 20]
-
-	mov eax, edi ;//we return dst
-
-	mov edx, ecx
-	shr ecx, 2
-	rep movsd
-
-	mov cx, dx
-	and cx, 3
-	rep movsb
-
-	pop esi
-	pop edi
-	retd
-
-
-
-;//cdecl
-;//dword size
-;//dword s2
-;//dword s1
-memcmp:
-strncmp:
-	push si
-	push di
-
-	xor si, si
-	mov di, si
-	mov es, di
-
-	cld
-	mov si, word [esp +  8]
-	mov di, word [esp + 12]
-	mov cx, word [esp + 16]
-	repe cmpsb
-
-
-	mov eax, 1
-	mov ecx, -1
-	je .zero
-	cmovb eax, ecx
-	jmp .ret
-
-.zero:
-	xor eax, eax
-.ret:
-	pop di
-	pop si
-	retd
-
-
-
-
-
-SECTION .data
-
-sleep_finished:
-db 0
-
-
-
-
-
-SECTION .rodata
-
-msg_halted:
-db 10, "Execution halted", 0
-

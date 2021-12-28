@@ -19,36 +19,32 @@
 
 
 
-#ifndef _INTERRUPT_H_
-#define _INTERRUPT_H_
+#ifndef _VBR_H_
+#define _VBR_H_
 
-
-#include <stdint.h>
-
-#include "bootloader.h"
-
-
-
-typedef struct
-{
-	uint32_t eax;
-	uint32_t ecx;
-	uint32_t edx;
-	uint32_t ebx;
-	uint32_t esi;
-	uint32_t edi;
-	uint32_t ebp;
-	uint32_t eflags;
-} registers_info_t;
+#include "defs.h"
+#include "mbr.h"
 
 
 
 _EXTERN_C_
 
-void interrupt(registers_info_t*, uint8_t vector);
+[[noreturn]]
+void halt();
+
+
+mbr_entry_t* get_partition_table_entry();
+
+
+[[noreturn]]
+void native_boot();
+
+
+uint32_t rh_get_boot_options(stos_request_header_t*);
+uint32_t rh_boot            (stos_request_header_t*);
 
 _EXTERN_C_END_
 
 
 
-#endif //!_INTERRUPT_H_
+#endif //!_VBR_H_

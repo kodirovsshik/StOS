@@ -21,7 +21,9 @@
 
 extern bootloader_main_wrapper
 extern __bootloader_size_sectors
+extern __bootloader_end
 extern MBR_VERSION
+extern heap_top
 
 
 
@@ -142,6 +144,24 @@ times 79 - ($ - mbr) db 0x00
 	test edx, 1 << 15 ;//test for CMOV
 	jz cpu_err
 	;//Got CMOV
+
+	int 0x12
+	cli
+
+	xor bx, bx
+	mov ss, bx
+
+	cmp ax, 64
+
+	mov sp, bx
+	mov ax, __bootloader_end + 2048
+	cmovb sp, ax
+
+	mov dx, __bootloader_end
+	cmovae ax, dx
+
+	movzx eax, ax
+	mov dword [heap_top], eax
 
 	jmp 0x0000 : bootloader_main_wrapper
 

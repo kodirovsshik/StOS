@@ -19,36 +19,50 @@
 
 
 
-#ifndef _IO_H_
-#define _IO_H_
+#ifndef _GPT_H_
+#define _GPT_H_
+
 
 
 #include <stdint.h>
 
-#include "bootloader.h"
+
+
+typedef struct
+{
+	char signature[8];
+	uint32_t revision;
+	uint32_t header_size;
+	uint32_t header_crc;
+	uint32_t reserved;
+	uint64_t header_current_lba;
+	uint64_t header_reserved_lba;
+	uint64_t usable_lba_begin;
+	uint64_t usable_lba_end;
+	char guid[16];
+	uint64_t partition_table_begin;
+	uint32_t partition_table_size;
+	uint32_t partition_table_entry_size;
+	uint32_t partition_table_crc;
+	char padding[0x1A4];
+} gpt_header_t;
+
+static_assert(sizeof(gpt_header_t) == 512);
 
 
 
-_EXTERN_C_
+typedef struct
+{
+	char type_guid[16];
+	char partition_guid[16];
+	uint64_t first_lba;
+	uint64_t last_lba;
+	uint64_t flags;
+	uint16_t name[36];
+} gpt_entry_t;
 
-
-void select_video_page(uint8_t n);
-
-void puts(const char*);
-void putc(char);
-void endl();
-void put0x32x(uint32_t x);
-void put32x(uint32_t x);
-void put32u(uint32_t u);
-void tabulate(int times);
-
-
-uint16_t getch();
-uint16_t kbhit();
-
-
-_EXTERN_C_END_
+static_assert(sizeof(gpt_entry_t) == 128);
 
 
 
-#endif //!_IO_H_
+#endif //!_GPT_H_

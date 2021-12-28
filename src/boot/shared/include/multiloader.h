@@ -18,17 +18,21 @@
 #endif
 
 
+
 /*
-
-multiliader.h - Basic defines and typedefs for
+multiliader.h - Basic macros and typedefs for
 MBR/VBR cooperation
-
 */
 
 #ifndef _MULTILOADER_H_
 #define _MULTILOADER_H_
 
 #include <stdint.h>
+#include <stddef.h>
+
+#include "defs.h"
+
+
 
 
 
@@ -49,18 +53,26 @@ inline const char* get_vbr_invoke_error_desc(int error);
 
 
 
+
+
 //Request return error codes
 
-#define STOS_REQ_INVOKE_OK 0
-#define STOS_REQ_INVOKE_ERR_INVALID_REQUEST_ID 1
-#define STOS_REQ_INVOKE_ERR_READ_ERR 2
+#define STOS_REQ_INVOKE_SUCCESS 0x80000000
+#define STOS_REQ_INVOKE_ERR_INVALID_REQUEST_ID 0x80000001
+#define STOS_REQ_INVOKE_ERR_READ_ERR 0x80000002
+#define STOS_REQ_INVOKE_ERR_BAD_CPU 0x80000003
+#define STOS_REQ_INVOKE_ERR_INVALID_REQUEST 0x80000004
+
+
 
 
 
 //VBR services
 
 #define STOS_REQ_GET_MBR_BOOT_OPTIONS 1
-#define STOS_REQ_MBR_BOOT 2
+#define STOS_REQ_BOOT 2
+
+
 
 
 
@@ -71,14 +83,27 @@ enum class bootability_status_t : uint8_t
 {
 	bootable = 1,
 	no_stos,
-	no_partition,
 	fs_error,
 	read_error,
 	no_disk
 };
 
+struct stos_boot_list_t
+{
+	typedef struct
+	{
+		uint32_t n;
+		bootability_status_t status;
+	} PACKED entry_t;
 
-//STOS_REQ_MBR_BOOT
+	stos_boot_list_t* next;
+	uint32_t size;
+	entry_t arr[];
+};
+
+
+/*
+//STOS_REQ_BOOT
 enum class boot_error_t : uint8_t
 {
 	read_error = 1,
@@ -88,6 +113,14 @@ enum class boot_error_t : uint8_t
 	out_of_memory,
 	cpuid_error
 };
+*/
+typedef struct
+{
+	uint32_t partition;
+	uint8_t disk;
+	bool is_gpt : 1;
+	bool has_signature : 1;
+} stos_boot_req_data_t;
 
 
 
@@ -96,19 +129,20 @@ enum class boot_error_t : uint8_t
 
 
 
-inline const char* get_vbr_invoke_error_desc(int n)
+
+inline const char* get_vbr_invoke_error_desc(uint32_t n)
 {
 	static const char* const arr[] =
 	{
 		"No error",
 		"Invalid request ID",
-		"Read error",
 		"(unknown error)"
 	};
 
 	static const size_t N = sizeof(arr) / sizeof(arr[0]);
 
-	if (n < 0 || (size_t)n >= N)
+	n -= 0x80000000;
+	if ((size_t)n >= N)
 		n = N - 1;
 
 	return arr[n];
@@ -120,7 +154,6 @@ inline const char* get_bootability_status_desc(bootability_status_t s)
 	{
 	case bootability_status_t::bootable:     return "Bootable";
 	case bootability_status_t::no_stos:      return "No StOS installation found";
-	case bootability_status_t::no_partition: return "Partition not present";
 	case bootability_status_t::fs_error:     return "Filesystem error";
 	case bootability_status_t::read_error:   return "Read error";
 	case bootability_status_t::no_disk:      return "Disk not present";

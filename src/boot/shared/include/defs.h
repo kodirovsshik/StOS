@@ -19,12 +19,8 @@
 
 
 
-#ifndef _AUX_H_
-#define _AUX_H_
-
-#include <stddef.h>
-
-
+#ifndef _DEFS_H_
+#define _DEFS_H_
 
 #ifdef __cplusplus
 	#define _EXTERN_C_ extern "C" {
@@ -36,25 +32,4 @@
 
 #define PACKED __attribute__((packed))
 
-
-
-_EXTERN_C_
-
-void* memset  (void* dst, int val, size_t count);
-void* memset32(void* dst, int val, size_t count);
-void* memcpy(void* dest, const void* src, size_t count);
-int strncmp(const char* s1, const char* s2, size_t max);
-int memcmp (const void* p1, const void* p2, size_t size);
-
-_EXTERN_C_END_
-
-
-/*
-inline void* memset  (void* dst, int val, size_t count)
-inline void* memset32(void* dst, int val, size_t count);
-inline void* memcpy(void* dest, const void* src, size_t count);
-inline int strncmp(const char* s1, const char* s2, size_t max);
-inline int memcmp (const void* p1, const void* p2, size_t size);
-*/
-
-#endif //!_AUX_H_
+#endif //!_DEFS_H_

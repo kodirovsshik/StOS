@@ -26,7 +26,8 @@
 #include <stdint.h>
 
 #include "mbr.h"
-#include "aux.h"
+#include "gpt.h"
+#include "defs.h"
 
 
 
@@ -36,6 +37,12 @@
 #define ERR_NO_MBR 2
 #define ERR_NO_PARTITION 3
 #define ERR_READ 4
+#define ERR_UNINITIALIZED 5
+#define ERR_NO_PARTITIONS 6
+#define ERR_INVALID_EBR 7
+#define ERR_NON_CONFORMING_GPT 8
+#define ERR_CORRUPTED_PARTITION_TABLE 9
+#define ERR_WRONG_PARTITION_TABLE_TYPE 10
 
 
 
@@ -44,17 +51,21 @@ _EXTERN_C_
 uint8_t get_drives_count();
 uint8_t get_floppies_count();
 uint8_t get_boot_drive();
-uint8_t read_drive_lba(uint8_t disk, uint32_t lba, void* ptr, uint16_t sectors);
-uint8_t write_drive_lba(uint8_t disk, uint32_t lba, const void* ptr, uint16_t sectors);
+
+uint8_t read_drive_lba(uint8_t disk, uint64_t lba, void* ptr, uint16_t sectors);
+uint8_t write_drive_lba(uint8_t disk, uint64_t lba, const void* ptr, uint16_t sectors);
+
 bool drive_lba_supported(uint8_t disk);
 
 _EXTERN_C_END_
 
 
 
+
 struct mbr_partition_info_t
 {
 	uint32_t lba = -1;
+	uint32_t size = 0;
 	uint8_t type;
 	bool active : 1 = false;
 };
@@ -76,8 +87,15 @@ struct partition_iterator_t
 	void next();
 	void reset();
 
+	uint32_t get_mbr_info(mbr_partition_info_t*) const;
+	uint32_t get_gpt_info(gpt_partition_info_t*) const;
+
+	uint32_t get_mbr_entry(mbr_entry_t*) const;
+	uint32_t get_gpt_entry(gpt_entry_t*) const;
+
 private:
 	void _next();
+	int _valid_for_partitions() const;
 };
 
 struct disk_t
@@ -95,7 +113,7 @@ struct disk_t
 
 	uint8_t init(uint8_t disk);
 
-	partition_iterator_t begin() const;
+	partition_iterator_t begin();
 
 private:
 	uint8_t _init(uint8_t);

@@ -19,52 +19,36 @@
 
 
 
-#ifndef _GPT_H_
-#define _GPT_H_
-
+#ifndef _INTERRUPT_H_
+#define _INTERRUPT_H_
 
 
 #include <stdint.h>
 
-//#include "aux.h"
+#include "defs.h"
 
 
 
 typedef struct
 {
-	char signature[8];
-	uint32_t revision;
-	uint32_t header_size;
-	uint32_t header_crc;
-	uint32_t reserved;
-	uint64_t header_current_lba;
-	uint64_t header_reserved_lba;
-	uint64_t usable_lba_begin;
-	uint64_t usable_lba_end;
-	char guid[16];
-	uint64_t partition_table_begin;
-	uint32_t partition_table_size;
-	uint32_t partition_table_entry_size;
-	uint32_t partition_table_crc;
-	char padding[0x1A4];
-} gpt_header_t;
-
-static_assert(sizeof(gpt_header_t) == 512);
+	uint32_t eax;
+	uint32_t ecx;
+	uint32_t edx;
+	uint32_t ebx;
+	uint32_t esi;
+	uint32_t edi;
+	uint32_t ebp;
+	uint32_t eflags;
+} registers_info_t;
 
 
 
-typedef struct
-{
-	char type_guid[16];
-	char partition_guid[16];
-	uint64_t first_lba;
-	uint64_t last_lba;
-	uint64_t flags;
-	uint16_t name[32];
-} gpt_entry_t;
+_EXTERN_C_
 
-static_assert(sizeof(gpt_entry_t) == 128);
+void interrupt(registers_info_t*, uint8_t vector);
+
+_EXTERN_C_END_
 
 
 
-#endif //!_GPT_H_
+#endif //!_INTERRUPT_H_

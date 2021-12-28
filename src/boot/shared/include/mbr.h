@@ -26,7 +26,7 @@
 
 #include <stdint.h>
 
-#include "aux.h"
+#include "defs.h"
 
 
 
@@ -49,9 +49,9 @@ typedef struct
 	chs_t end_chs;
 	uint32_t start_lba;
 	uint32_t count_lba;
-} PACKED partition_entry_t;
+} PACKED mbr_entry_t;
 
-static_assert(sizeof(partition_entry_t) == 16);
+static_assert(sizeof(mbr_entry_t) == 16);
 
 
 
@@ -59,7 +59,7 @@ typedef struct
 {
 	uint8_t code[440];
 	uint8_t uid[6];
-	partition_entry_t table[4];
+	mbr_entry_t table[4];
 	union
 	{
 		uint8_t sig[2];
@@ -90,7 +90,7 @@ typedef struct
 	} PACKED metadata;
 
 	uint8_t uid[6];
-	partition_entry_t table[4];
+	mbr_entry_t table[4];
 	union
 	{
 		uint8_t sig[2];

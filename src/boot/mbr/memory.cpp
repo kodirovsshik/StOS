@@ -20,54 +20,13 @@
 
 
 #include "io.h"
-#include "disk.hpp"
 #include "aux.h"
 
 
 
 _EXTERN_C_
 
-
-[[noreturn]]
-void __err(const char* what, const char* file, uint32_t line)
-{
-	puts("\n\nCRITICAL ERROR:\n");
-	puts(what);
-	puts("\n\nAt \"");
-	puts(file);
-	puts("\":");
-	put32u(line);
-	puts("\nEXECUTION HALTED");
-	halt();
-}
-
-
-
-#if 0
-//void _sleep_ticks(uint16_t ticks);
-void _sleep_ns_unchecked(int ns);
-
-void nanosleep(int64_t ns)
-{
-	static constexpr int threshold = 54923771;
-
-	while (ns > 0)
-	{
-		uint64_t current = (ns > threshold) ? threshold : ns;
-
-		_sleep_ns_unchecked(current);
-		ns -= current;
-	}
-}
-
-void sleep(uint32_t ms)
-{
-	nanosleep((uint64_t)ms * 1000000);
-}
-#endif
-
-
-uintptr_t heap_top = (uintptr_t)&STACK_TOP;
+uintptr_t heap_top;
 
 void* get_heap_top()
 {
@@ -140,18 +99,6 @@ void free(void* p, size_t n)
 
 		endl();
 	}
-}
-
-
-
-int _invoke_vbr(stos_request_header_t*, const void*, uint8_t);
-
-int invoke_vbr(stos_request_header_t* hdr, uint8_t vbr_disk, uint32_t vbr_lba)
-{
-	if (read_drive_lba(vbr_disk, vbr_lba, (void*)0x7C00, 1) != 0)
-		return STOS_REQ_INVOKE_ERR_READ_ERR;
-
-	return _invoke_vbr(hdr, "StOSrequ", vbr_disk);
 }
 
 _EXTERN_C_END_
