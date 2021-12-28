@@ -22,26 +22,22 @@
 OUTPUT_FORMAT("elf32-i386")
 OUTPUT_ARCH(i386)
 
-ENTRY(main)
+ENTRY(entry)
 
 SECTIONS
 {
+	PROVIDE(VBR_VERSION = 0x0100);
 
-	PROVIDE(MBR_VERSION = 0x0100);
 
-	. = 0x400;
+	PROVIDE(__vbr_start = .);
+
+	. = 0x7C00;
 	.text0 :
 	{
 		*(.boot_sector_text)
 	}
-
-
-	PROVIDE(__bootloader_start = .);
 	
-	.text :
-	{
-		*(.text)
-	}
+	.text : { *(.text) }
 
 	. = ALIGN(., 16);
 	.data : { *(.data) }
@@ -67,15 +63,10 @@ SECTIONS
 
 
 	. = ALIGN(4);
-	PROVIDE(__bootloader_end = .);
+	PROVIDE(__vbr_end = .);
 
-	/*
-	PROVIDE(STACK_SIZE = 2048);
-	PROVIDE(STACK_TOP = ALIGN(__bootloader_end + STACK_SIZE, 4));
-	*/
-	
-	PROVIDE(__bootloader_size = __bootloader_end - __bootloader_start);
-	PROVIDE(__bootloader_size_sectors = ALIGN(__bootloader_size, 512) / 512);
+	PROVIDE(__vbr_size = __vbr_end - __vbr_start);
+	PROVIDE(__vbr_size_sectors = ALIGN(__vbr_size, 512) / 512);
 
 
 
