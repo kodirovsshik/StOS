@@ -213,12 +213,42 @@ void update_gpt()
 	update_gpt(false);
 }
 
+void create_protective_mbr()
+{
+	fseek(disk_f, 0, SEEK_END);
+	long file_size = ftell(disk_f);
+
+	vbr_t vbr;
+	mbr_t& mbr = *(mbr_t*)&vbr;
+	auto& pmbre = mbr.table[0];
+
+	memset(&mbr, 0, sizeof(mbr));
+
+	pmbre.start_chs.sec = 1;
+	pmbre.end_chs.head = 0xFE;
+	pmbre.end_chs.sec = 63;
+	pmbre.end_chs.cyl = 1023;
+	pmbre.start_lba = 1;
+	pmbre.count_lba = file_size / 512 - 1;
+	pmbre.type = 0xEE;
+
+	memcpy(vbr.code1, "\xeb\x58\x90", 3);
+	memcpy(vbr.code1 + 90, "\xcd\x18", 2);
+	mbr.signature = 0xAA55;
+
+	fseek(disk_f, 0, SEEK_SET);
+	check(fwrite(&mbr, 1, 512, disk_f) == 512, ERR_WRITE, "Write error on %s", argv1);
+	fflush(disk_f);
+}
+
 int command_table(int argc, const char* const* argv)
 {
 	check(argc == 1, ERR_ARGS_COUNT, usage_table, argv0);
 
 	uint32_t n;
 	check(sscanf(argv[0], "%u", &n) == 1 && n >= 128, ERR_ARGS, "Invalid partitions count: %s", argv[0]);
+
+	create_protective_mbr();
 
 	gpt_header_t hdr;
 	memset(&hdr, 0, sizeof(hdr));
@@ -242,6 +272,20 @@ int command_table(int argc, const char* const* argv)
 	update_gpt();
 	return 0;
 }
+
+int command_create(int argc, const char* const* argv)
+{
+	if (argc < 3 || argc > 4)
+	{
+		fprintf(stderr, usage_create, argv0);
+		return ERR_ARGS_COUNT;
+	}
+
+	//char guid[17] = "StOS SystemFiles";
+	return -1;
+}
+
+
 //commands:
 //table #n
 //create #n first last

@@ -9,8 +9,16 @@ define nint
 	nskip 2	
 end
 
-define ncall16
+define nc16
 	nskip 3
+end
+
+define nc32
+	nskip 5
+end
+
+define xsp
+	x/4xw $esp
 end
 
 

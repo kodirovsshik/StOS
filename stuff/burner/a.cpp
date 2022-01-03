@@ -162,6 +162,7 @@ int command_mbr(int argc, const char* const* argv)
 	check(f_mbr,  _ERR_FILE_MBR,   "Failed to open %s", argv[1]);
 
 	mbr_bootloader_t mbr, mbr_disk;
+	vbr_t& vbr_disk = *(vbr_t*)&mbr_disk, &vbr = *(vbr_t*)&mbr;
 	check(fread(&mbr,      1, 512, f_mbr)  == 512, _ERR_READ, "Failed to read from %s", argv[1]);
 	check(fread(&mbr_disk, 1, 512, f_disk) == 512, _ERR_READ, "Failed to read from %s", argv[1]);
 
@@ -174,9 +175,10 @@ int command_mbr(int argc, const char* const* argv)
 		check(false, disk.init_status | 0x40000000, "%s initialization failed", argv[0]);
 
 	fseek(f_disk, 0, SEEK_SET);
-	memcpy(mbr_disk.code, mbr.code, sizeof(mbr_bootloader_t::code));
-	memcpy(&mbr_disk.metadata, &mbr.metadata, sizeof(mbr_bootloader_t::metadata));
-	fwrite(&mbr_disk, 1, 512, f_disk);
+	memcpy(vbr_disk.code1, vbr.code1, sizeof(vbr_t::code1));
+	memcpy(vbr_disk.code2, vbr.code2, sizeof(vbr_t::code2));
+	memcpy(&vbr_disk.metadata, &vbr.metadata, sizeof(vbr_t::metadata));
+	fwrite(&vbr_disk, 1, 512, f_disk);
 
 	if (disk.has_gpt)
 	{
@@ -301,16 +303,46 @@ int command_vbr(int argc, const char* const* argv)
 		fseek(f_vbr, 0, SEEK_SET);
 		while (feof(f_vbr) == 0)
 		{
-			check(fread(&mbr, 1, 512, f_vbr) > 0, _ERR_READ, "Failed to read %s", argv[1]);
+			check(fread(&mbr, 1, 512, f_vbr) != 0, _ERR_READ, "Failed to read %s", argv[1]);
 			check(fwrite(&mbr, 1, 512, f_disk) == 512, _ERR_WRITE, "Failed to write %s", argv[0]);
 		}
 	}
 	else
 	{
-		//TODO: implement
-		return -1;
+		uint32_t lba;
+		if (partition != 0xFFFFFFFF)
+		{
+			check(partition <= d_disk.partitions_number, _ERR_NO_FIT_PART, "%s has no partition %u", argv[0], partition);
+
+			auto iter = d_disk.begin();
+			iter.partition_number = partition - 1;
+			check(iter.valid(), _ERR_NO_FIT_PART, "Failed to find partition %s on %u", partition, argv[0]);
+
+			mbr_entry_t part;
+			check(iter.get_mbr_entry(&part) == 0, _ERR_NO_FIT_PART, "Failed to find partition %s on %u", partition, argv[0]);
+			lba = part.start_lba;
+		}
+		else
+		{
+			fseek(f_disk, 0, SEEK_SET);
+			mbr_bootloader_t mbr;
+			check(fread(&mbr, 1, 512, f_disk) == 512, _ERR_READ, "Failed to read %s", argv[1]);
+			lba = mbr.metadata.size;
+		}
+
+		uint8_t buffer[512];
+
+		//printf("LBA: %u\n", lba);
+		fseek(f_disk, lba * (long)512, SEEK_SET);
+		fseek(f_vbr, 0, SEEK_SET);
+		while (feof(f_vbr) == 0)
+		{
+			check(fread(buffer, 1, 512, f_vbr) != 0, _ERR_READ, "Failed to read %s", argv[1]);
+			check(fwrite(buffer, 1, 512, f_disk) == 512, _ERR_WRITE, "Failed to write %s", argv[0]);
+		}
 	}
 
+	disk_free(dn_disk, f_disk);
 	return 0;
 }
 
