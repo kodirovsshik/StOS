@@ -9,7 +9,6 @@ Remade:
 
 		StOS VBR invocation:
 			DS:SI = mbr entry with
-				//.active = VBR drive
 				.start = low  4 bytes of VBA start
 				.count = high 4 bytes of VBA start
 			BX = ptr "StOSrequ"
@@ -147,11 +146,6 @@ Remade:
 
 				
 notes:
-	✓ Do not tie to MBR only
-	✓ Learn more about microsoft extended partition
-	✓ Write partition iterator
-	✓ use stack = 0xFA00..0xFE00 if there is 64KiB of memory
-	✓ initialize heap top from asm code
 #	thoughts:
 	props:
 		scalable
