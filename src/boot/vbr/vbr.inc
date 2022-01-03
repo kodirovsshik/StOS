@@ -27,3 +27,6 @@
 %define CX_BACKUP word [0x5A6]
 %define INVOKE_DATETIME_AREA 0x5A8
 %define IS_STOS_REQ byte [0x5A9]
+
+
+%define STACK_SIZE 2048

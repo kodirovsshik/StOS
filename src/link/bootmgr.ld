@@ -29,14 +29,19 @@ SECTIONS
 
 	PROVIDE(MBR_VERSION = 0x0100);
 
+	PROVIDE(SEG_CODE16 = gdt.code16 - gdt);
+	PROVIDE(SEG_CODE32 = gdt.code32 - gdt);
+	PROVIDE(SEG_DATA16 = gdt.data16 - gdt);
+	PROVIDE(SEG_DATA32 = gdt.data32 - gdt);
+
+
 	. = 0x400;
+	PROVIDE(__bootloader_start = .);
+
 	.text0 :
 	{
 		*(.boot_sector_text)
 	}
-
-
-	PROVIDE(__bootloader_start = .);
 	
 	.text :
 	{
@@ -85,15 +90,6 @@ SECTIONS
    are permitted in any medium without royalty provided the copyright
    notice and this notice are preserved.  */
 
-  /* Stabs debugging sections.  */
-  .stab          0 : { *(.stab) }
-  .stabstr       0 : { *(.stabstr) }
-  .stab.excl     0 : { *(.stab.excl) }
-  .stab.exclstr  0 : { *(.stab.exclstr) }
-  .stab.index    0 : { *(.stab.index) }
-  .stab.indexstr 0 : { *(.stab.indexstr) }
-  .comment       0 : { *(.comment) }
-  .gnu.build.attributes : { *(.gnu.build.attributes .gnu.build.attributes.*) }
   /* DWARF debug sections.
      Symbols in the DWARF debugging sections are relative to the beginning
      of the section so we begin them at 0.  */

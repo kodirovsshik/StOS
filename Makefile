@@ -18,24 +18,26 @@ ifeq (0,1)
 endif
 
 
-override SHELL := /bin/bash
+SHELL := /bin/bash
 
 override LOCAL_PATH := $(shell pwd)
 
+NOECHO := 1>/dev/null 2>&1
 
-SYSTEM_DRIVE1_FILE := system/drive
-SYSTEM_DRIVE1_SIZE := 10
-SYSTEM_DRIVE1_FILE_VB := system/vb_drive.vmdk
 
-SYSTEM_DRIVE2_FILE := system/drive2
-SYSTEM_DRIVE2_SIZE := 10
-SYSTEM_DRIVE2_FILE_VB := system/vb_drive2.vmdk
+SYSTEM_DISK1_FILE := system/disk
+SYSTEM_DISK1_SIZE := 10
+SYSTEM_DISK1_FILE_VB := system/vb_disk.vmdk
 
-SYSTEM_DRIVES :=
-SYSTEM_DRIVES += $(SYSTEM_DRIVE1_FILE)
-SYSTEM_DRIVES += $(SYSTEM_DRIVE1_FILE_VB)
-SYSTEM_DRIVES += $(SYSTEM_DRIVE2_FILE)
-SYSTEM_DRIVES += $(SYSTEM_DRIVE2_FILE_VB)
+SYSTEM_DISK2_FILE := system/disk2
+SYSTEM_DISK2_SIZE := 10
+SYSTEM_DISK2_FILE_VB := system/vb_disk2.vmdk
+
+SYSTEM_DISKS :=
+SYSTEM_DISKS += $(SYSTEM_DISK1_FILE)
+SYSTEM_DISKS += $(SYSTEM_DISK1_FILE_VB)
+SYSTEM_DISKS += $(SYSTEM_DISK2_FILE)
+SYSTEM_DISKS += $(SYSTEM_DISK2_FILE_VB)
 
 
 MBR_SYSTEM_PARTITION_TYPE := 0x83
@@ -46,11 +48,11 @@ QEMU64_MEMORY_MB := 6144
 QEMU32_CPU := base,+cmov
 QEMU64_CPU := qemu64
 override QEMU_COMMON_ARGS := -no-reboot -no-shutdown \
-	-drive file=$(SYSTEM_DRIVE1_FILE),format=raw \
-	-drive file=$(SYSTEM_DRIVE2_FILE),format=raw $(QEMU_ARGS)
+	-drive file=$(SYSTEM_DISK1_FILE),format=raw \
+	-drive file=$(SYSTEM_DISK2_FILE),format=raw $(QEMU_ARGS)
 override QEMU32_COMMON_ARGS := -m size=$(QEMU32_MEMORY_MB) -cpu $(QEMU32_CPU)
 override QEMU64_COMMON_ARGS := -m size=$(QEMU64_MEMORY_MB) -cpu $(QEMU64_CPU)
-QEMU_TEMPDBG_ARGS := -s -S
+QEMU_DEBUG_ARGS := -s -S
 
 override QEMU32 := qemu-system-i386   $(QEMU32_COMMON_ARGS) $(QEMU_COMMON_ARGS)
 override QEMU64 := qemu-system-x86_64 $(QEMU64_COMMON_ARGS) $(QEMU_COMMON_ARGS)
@@ -85,11 +87,9 @@ CXX := g++
 override _CC := $(CC)
 override _CXX := $(CXX) -std=c++20
 
-override _CC16 := $(CC16) $(_CC_ARGS)
 override _CC32 := $(CC32) $(_CC_ARGS)
 override _CC64 := $(CC64) $(_CC_ARGS)
 
-override _CXX16 := $(CXX16) $(_CXX_ARGS)
 override _CXX32 := $(CXX32) $(_CXX_ARGS)
 override _CXX64 := $(CXX64) $(_CXX_ARGS)
 
@@ -108,19 +108,20 @@ override GDB64 := $(GDB) $(_GDB_ARGS) $(GDB_ARGS) -x stuff/gdb/gdb_script64
 
 STOS_LOADER_MBR_OBJS :=
 
-STOS_LOADER_MBR_OBJS += temp/boot/mbr/main.cpp.elf16
-STOS_LOADER_MBR_OBJS += temp/boot/mbr/bootloader.cpp.elf16
-STOS_LOADER_MBR_OBJS += temp/boot/mbr/memory.cpp.elf16
+STOS_LOADER_MBR_OBJS += temp/boot/mbr/main.cpp.elf32
+STOS_LOADER_MBR_OBJS += temp/boot/mbr/bootloader.cpp.elf32
+STOS_LOADER_MBR_OBJS += temp/boot/mbr/memory.cpp.elf32
 
 STOS_LOADER_MBR_OBJS += temp/boot/mbr/entry.asm.elf32
 STOS_LOADER_MBR_OBJS += temp/boot/mbr/bootloader.asm.elf32
 
-STOS_LOADER_MBR_OBJS += temp/boot/shared/io.cpp.elf16
-STOS_LOADER_MBR_OBJS += temp/boot/shared/disk.cpp.elf16
+STOS_LOADER_MBR_OBJS += temp/boot/shared/io.cpp.elf32
+STOS_LOADER_MBR_OBJS += temp/boot/shared/disk.cpp.elf32
 
 STOS_LOADER_MBR_OBJS += temp/boot/shared/interrupt.asm.elf32
 STOS_LOADER_MBR_OBJS += temp/boot/shared/io.asm.elf32
 STOS_LOADER_MBR_OBJS += temp/boot/shared/aux.asm.elf32
+STOS_LOADER_MBR_OBJS += temp/boot/shared/cpuid.asm.elf32
 
 STOS_LOADER_MBR_ELF := result/bootloader_mbr.elf
 STOS_LOADER_MBR_RAW := result/bootloader_mbr.img
@@ -132,17 +133,19 @@ VBR_OBJS :=
 VBR_OBJS += temp/boot/vbr/entry.asm.elf32
 VBR_OBJS += temp/boot/vbr/core.asm.elf32
 
-VBR_OBJS += temp/boot/vbr/main.cpp.elf16
-VBR_OBJS += temp/boot/vbr/rh_boot.cpp.elf16
-VBR_OBJS += temp/boot/vbr/rh_get_boot_options.cpp.elf16
-VBR_OBJS += temp/boot/vbr/native_boot.cpp.elf16
+VBR_OBJS += temp/boot/vbr/main.cpp.elf32
+VBR_OBJS += temp/boot/vbr/rh_boot.cpp.elf32
+VBR_OBJS += temp/boot/vbr/rh_get_boot_options.cpp.elf32
+VBR_OBJS += temp/boot/vbr/native_boot.cpp.elf32
+VBR_OBJS += temp/boot/vbr/memory.cpp.elf32
 
-VBR_OBJS += temp/boot/shared/disk.cpp.elf16
-VBR_OBJS += temp/boot/shared/io.cpp.elf16
+VBR_OBJS += temp/boot/shared/disk.cpp.elf32
+VBR_OBJS += temp/boot/shared/io.cpp.elf32
 
 VBR_OBJS += temp/boot/shared/io.asm.elf32
 VBR_OBJS += temp/boot/shared/aux.asm.elf32
 VBR_OBJS += temp/boot/shared/interrupt.asm.elf32
+VBR_OBJS += temp/boot/shared/cpuid.asm.elf32
 
 VBR_ELF := result/vbr.elf
 VBR_RAW := result/vbr.img
@@ -152,7 +155,11 @@ INIT_BUILD_DIRS := temp/init
 
 
 PARTITIONER_MBR := stuff/partitioner/mbr
+PARTITIONER_GPT := stuff/partitioner/gpt
 BURNER := stuff/burner/a
+MBR_CHECKER := stuff/mbr_detecter/a
+
+CRC32_IMPL := src/crc/crc32.cpp
 
 
 
@@ -166,7 +173,8 @@ CREATE_OUTPUT_DIR = X="$@" ; mkdir -p $${X%/*}
 
 .PHONY: all clean bootloader loader rebuild host_boot host_boot_debug
 .PHONY: debug32_qemu debug64_qemu system_wipe system_burn_mbr
-.PHONY: run32 run32v run64 run64v todo build_init
+.PHONY: run32 run32v run64 run64v todo build_init auxillary
+.PHONY: system_wipe_partition_table system_create_mbr system_create_gpt
 
 
 
@@ -174,7 +182,8 @@ all: stos_loader_mbr vbr
 
 
 
-rebuild: clean all
+rebuild: clean
+	make
 
 
 
@@ -192,8 +201,8 @@ vbr: $(VBR_RAW)
 
 
 QEMU_HOST_ARGS := -m 3072 -no-reboot -no-shutdown \
-	-drive file=$(SYSTEM_DRIVE1_FILE),format=raw,index=0 \
-	-drive file=$(SYSTEM_DRIVE2_FILE),format=raw,index=1 \
+	-drive file=$(SYSTEM_DISK1_FILE),format=raw,index=0 \
+	-drive file=$(SYSTEM_DISK2_FILE),format=raw,index=1 \
 	-drive file=/dev/sda,format=raw,index=2 \
 	-drive file=/dev/sdb,format=raw,index=3 \
 
@@ -210,25 +219,28 @@ $(STOS_LOADER_MBR_RAW): $(STOS_LOADER_MBR_OBJS)
 	$(LINK32) -T src/link/bootmgr.ld $^ -o $(STOS_LOADER_MBR_ELF)
 	$(OBJCOPY32) -O binary $(STOS_LOADER_MBR_ELF) $@
 	ndisasm -o 0x400 $@ > $@.disasm
-	xxd $@ > $@.disasm
+	xxd $@ > $@.hexdump
 
 $(VBR_RAW): $(VBR_OBJS)
 	$(LINK32) -T src/link/vbr.ld $^ -o $(VBR_ELF)
 	$(OBJCOPY32) -O binary $(VBR_ELF) $@
 	ndisasm -o 0x7C00 $@ > $@.disasm
-	xxd $@ > $@.disasm
+	xxd $@ > $@.hexdump
 
 
 
 clean:
-	rm -rf temp/* result/*
-	mkdir -p temp/boot/mbr
+	rm -rf temp result/*
 
 
 
 clean_wipe:
 	rm -rf system temp result
-	rm -f $(PARTITIONER_MBR) $(BURNER)
+	rm -f $(PARTITIONER_MBR) $(PARTITIONER_GPT) $(BURNER) $(MBR_CHECKER)
+
+
+
+auxillary: $(PARTITIONER_MBR) $(PARTITIONER_GPT) $(BURNER) $(MBR_CHECKER)
 
 
 
@@ -236,26 +248,26 @@ $(INIT_BUILD_DIRS):
 	tree -dfi --noreport src | xargs -i mkdir -p "temp/{}"
 	mv temp/src/* temp
 	rm -r temp/src
-	mkdir result
+	mkdir -p result
 	touch $@
 
 
 
-temp/%.asm.elf32: src/%.asm $(INIT_BUILD_DIRS)
-	$(NASM) -f elf32 $< -o $@
+temp/boot/%.asm.elf32: src/boot/%.asm $(INIT_BUILD_DIRS)
+	$(NASM) -f elf32 $< -o $@ -Isrc/boot/shared/include
 
-temp/%.asm.elf64: src/%.asm $(INIT_BUILD_DIRS)
-	$(NASM) -f elf64 $< -o $@
+temp/boot/%.asm.elf64: src/boot/%.asm $(INIT_BUILD_DIRS)
+	$(NASM) -f elf64 $< -o $@ -Isrc/boot/shared/include
 
 
-temp/boot/%.c.elf16: src/boot/%.c $(INIT_BUILD_DIRS)
-	$(_CC16) $< -o $@ $(CC_INCLUDE_BOOT)
+#temp/boot/%.c.elf32: src/boot/%.c $(INIT_BUILD_DIRS)
+#	$(_CC16) $< -o $@ $(CC_INCLUDE_BOOT)
 
-temp/boot/shared/disk.cpp.elf16: src/boot/shared/disk.cpp $(INIT_BUILD_DIRS)
-	$(_CC16) $< -o $@ $(CC_INCLUDE_BOOT) -include src/boot/shared/include/aux.h
+#temp/boot/%.cpp.elf32: src/boot/%.cpp $(INIT_BUILD_DIRS)
+#	$(_CXX16) $< -o $@ $(CC_INCLUDE_BOOT)
 
-temp/boot/%.cpp.elf16: src/boot/%.cpp $(INIT_BUILD_DIRS)
-	$(_CXX16) $< -o $@ $(CC_INCLUDE_BOOT)
+temp/boot/shared/disk.cpp.elf32: src/boot/shared/disk.cpp $(INIT_BUILD_DIRS)
+	$(_CXX32) $< -o $@ $(CC_INCLUDE_BOOT) -include src/boot/shared/include/aux.h
 
 temp/boot/%.c.elf32: src/boot/%.c $(INIT_BUILD_DIRS)
 	$(_CC32) $< -o $@ $(CC_INCLUDE_BOOT)
@@ -272,13 +284,13 @@ temp/boot/%.cpp.elf64: src/boot/%.cpp $(INIT_BUILD_DIRS)
 
 
 debug32_qemu:
-	$(QEMU32) $(QEMU_TEMPDBG_ARGS) &
+	$(QEMU32) $(QEMU_DEBUG_ARGS) &
 	$(GDB32) || true
 
 
 
 debug64_qemu:
-	$(QEMU64) $(QEMU_TEMPDBG_ARGS) &
+	$(QEMU64) $(QEMU_DEBUG_ARGS) &
 	$(GDB64) || true
 
 
@@ -300,31 +312,54 @@ run64v:
 
 
 system_wipe:
-	rm -rf $(SYSTEM_DRIVES)
+	rm -rf $(SYSTEM_DISKS)
 	mkdir -p system
 
-	dd if=/dev/zero of=$(SYSTEM_DRIVE1_FILE) bs=1M count=$(SYSTEM_DRIVE1_SIZE)
-	VBoxManage internalcommands createrawvmdk -filename $(SYSTEM_DRIVE1_FILE_VB) -rawdisk "$(LOCAL_PATH)/$(SYSTEM_DRIVE1_FILE)" || true
+	dd if=/dev/zero of=$(SYSTEM_DISK1_FILE) bs=1M count=$(SYSTEM_DISK1_SIZE)
+	VBoxManage internalcommands createrawvmdk -filename $(SYSTEM_DISK1_FILE_VB) -rawdisk "$(LOCAL_PATH)/$(SYSTEM_DISK1_FILE)" || true
 
-	dd if=/dev/zero of=$(SYSTEM_DRIVE2_FILE) bs=1M count=$(SYSTEM_DRIVE2_SIZE)
-	VBoxManage internalcommands createrawvmdk -filename $(SYSTEM_DRIVE2_FILE_VB) -rawdisk "$(LOCAL_PATH)/$(SYSTEM_DRIVE2_FILE)" || true
+	dd if=/dev/zero of=$(SYSTEM_DISK2_FILE) bs=1M count=$(SYSTEM_DISK2_SIZE)
+	VBoxManage internalcommands createrawvmdk -filename $(SYSTEM_DISK2_FILE_VB) -rawdisk "$(LOCAL_PATH)/$(SYSTEM_DISK2_FILE)" || true
+
+
+
+system_wipe_disk_layout:
+	dd if=/dev/zero bs=1024 count=1 of=$(SYSTEM_DISK1_FILE) conv=notrunc
+	dd if=/dev/zero bs=512  count=1 of=$(SYSTEM_DISK1_FILE) conv=notrunc seek=$$(($(SYSTEM_DISK1_SIZE) * 1048576 - 512)
+
+
+
+system_create_dummy_disk_layout: auxillary
+	$(PARTITIONER_GPT) $(SYSTEM_DISK1_FILE) table 128
+	$(PARTITIONER_GPT) $(SYSTEM_DISK1_FILE) create 0 34 2081 53744f5320626f6f746c6f6164657220
+	$(PARTITIONER_GPT) $(SYSTEM_DISK1_FILE) create 1 2082 -1
+
+
+
+system_create_mbr: $(PARTITIONER_MBR)
+	stat $(NOECHO) $(SYSTEM_DISK1_FILE) || make system_wipe
+	make _system_create_mbr
+
+
+_system_create_mbr: $(PARTITIONER_MBR)
+	$(PARTITIONER_MBR) $(SYSTEM_DISK1_FILE) 1 0 0 0 0
+	$(PARTITIONER_MBR) $(SYSTEM_DISK1_FILE) 2 0 0 0 0
+	$(PARTITIONER_MBR) $(SYSTEM_DISK1_FILE) 3 0 0 0 0
+	$(PARTITIONER_MBR) $(SYSTEM_DISK1_FILE) 4 0 0 0 0
 
 
 
 $(PARTITIONER_MBR): $(PARTITIONER_MBR).cpp
 	$(_CXX) $< -o $@ -g $(CC_INCLUDE_BOOT)
+$(PARTITIONER_GPT): $(PARTITIONER_GPT).cpp $(CRC32_IMPL)
+	$(_CXX) $< -o $@ -g $(CC_INCLUDE_BOOT) $(CRC32_IMPL)
 $(BURNER): $(BURNER).cpp
 	$(_CXX) $< -o $@ -g $(CC_INCLUDE_BOOT) src/boot/shared/disk.cpp -include string.h
 
 
 
-system_reset_mbr: $(PARTITIONER)
-	$(PARTITIONER) $(SYSTEM_DRIVE1_FILE) 1 $(MBR_SYSTEM_PARTITION_TYPE) -1 -1 0
-
-
-
-system_burn_mbr: all
-	mkdir -p system
-	dd bs=1 if=$(STOS_LOADER_MBR_RAW) of=$(SYSTEM_DRIVE1_FILE) conv=notrunc count=440 #Copy initial data upto the partition table
-	dd bs=1 if=$(STOS_LOADER_MBR_RAW) of=$(SYSTEM_DRIVE1_FILE) conv=notrunc seek=510 skip=510 count=2 #Copy MBR marker
-	dd bs=1 if=$(STOS_LOADER_MBR_RAW) of=$(SYSTEM_DRIVE1_FILE) conv=notrunc seek=512 skip=512 #Copy MBR second stage
+system_burn_mbr: $(STOS_LOADER_MBR_RAW) $(VBR_RAW) auxillary
+	stat $(NOECHO) $(SYSTEM_DISK1_FILE) || make system_wipe
+	$(MBR_CHECKER) $(SYSTEM_DISK1_FILE) || make _system_create_mbr
+	stuff/burner/a mbr $(SYSTEM_DISK1_FILE) $<
+	stuff/burner/a vbr $(SYSTEM_DISK1_FILE) $(VBR_RAW)

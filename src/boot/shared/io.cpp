@@ -142,6 +142,13 @@ bool get32(uint32_t* dst, uint32_t max, uint32_t digits)
 	}
 }
 
+void cls()
+{
+	registers_info_t regs;
+	regs.eax = 0x0003;
+	interrupt(0x10, &regs);
+}
+
 
 
 
@@ -159,7 +166,7 @@ uint8_t get_floppies_count()
 		regs.eax = 0x0800;
 		regs.edx = i;
 
-		interrupt(&regs, 0x13);
+		interrupt(0x13, &regs);
 
 		if (regs.eflags & 1)
 			return i;

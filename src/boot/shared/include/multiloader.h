@@ -42,9 +42,9 @@ typedef struct
 {
 	uint16_t struct_size = 0;
 	uint16_t request_number;
-	uint16_t request_data; // IN/OUT
+	uint32_t request_data; // IN/OUT
+	uint32_t free_memory_begin;
 	uint16_t mbr_version;
-	uint16_t free_memory_begin;
 } stos_request_header_t;
 
 

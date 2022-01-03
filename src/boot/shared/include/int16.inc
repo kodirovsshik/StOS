@@ -1,4 +1,4 @@
-#if 0
+%if 0
 	  This file is a part of StOS project - a small operating system
 	  	made for learning purposes
 	  Copyright (C) 2021 Egorov Stanislav, kodirovsshik@mail.ru, kodirovsshik@gmail.com
@@ -15,43 +15,13 @@
 
 	  You should have received a copy of the GNU General Public License
 	  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#endif
+%endif
 
 
 
-#ifndef _IO_H_
-#define _IO_H_
+extern interrupt_smol
 
-
-#include <stdint.h>
-
-#include "defs.h"
-
-
-
-_EXTERN_C_
-
-
-void select_video_page(uint8_t n);
-
-void cls();
-void puts(const char*);
-void putc(char);
-void endl();
-void put0x32x(uint32_t x);
-void put32x(uint32_t x);
-void put32u(uint32_t u);
-bool get32(uint32_t* dst, uint32_t max, uint32_t digits);
-bool get32u(uint32_t* dst, uint32_t max = 0xFFFFFFFF);
-void tabulate(int times);
-
-
-uint16_t getch();
-uint16_t kbhit();
-
-
-_EXTERN_C_END_
-
-
-
-#endif //!_IO_H_
+%macro int16 1
+	push dword %1
+	call dword interrupt_smol
+%endmacro

@@ -19,6 +19,10 @@
 
 
 
+%include "int16.inc"
+
+
+
 global puts
 global putc
 global endl
@@ -31,19 +35,8 @@ global select_video_page
 
 
 
-BITS 16
+BITS 32
 SECTION .text
-
-
-
-;//cdecl
-;//dword uint8_t n
-select_video_page:
-	retd
-	mov ah, 5
-	mov al, byte [esp + 4]
-	int 0x10
-	retd
 
 
 
@@ -58,12 +51,12 @@ puts:
 	mov al, byte [edx]
 	test al, al
 	jz .ret
-	int 0x10
+	int16 0x10
 	inc edx
 	cmp al, 10
 	jne .loop
 	mov al, 13
-	int 0x10
+	int16 0x10
 	jmp .loop
 .ret:
 	pop ebx
@@ -78,11 +71,11 @@ putc:
 	mov ah, 0x0E
 	mov bx, 0x0007
 	mov al, byte [esp + 6]
-	int 0x10
+	int16 0x10
 	cmp al, 10
 	jne .ret
 	mov al, 13
-	int 0x10
+	int16 0x10
 .ret:
 	pop bx
 	retd
@@ -93,9 +86,9 @@ endl:
 	push bx
 	mov ax, 0x0E0D
 	mov bx, 0x0007
-	int 0x10
+	int16 0x10
 	mov al, 0x0A
-	int 0x10
+	int16 0x10
 	pop bx
 	retd
 
@@ -103,14 +96,14 @@ endl:
 
 getch:
 	xor ah, ah
-	int 0x16
+	int16 0x16
 	retd
 
 
 
 kbhit:
 	mov ah, 1
-	int 0x16
+	int16 0x16
 	retd
 
 
@@ -129,7 +122,7 @@ _drive_lba_helper:
 	mov si, word [esp + 8]
 	xor ax, ax
 	xchg ah, byte [si + 1]
-	int 0x13
+	int16 0x13
 	shr ax, 8
 	pop esi
 	retd
@@ -143,7 +136,7 @@ drive_lba_supported:
 	mov ah, 0x41
 	mov bx, 0x55AA
 	mov dl, byte [esp + 8]
-	int 0x13
+	int16 0x13
 	mov al, 0
 	jc .no
 

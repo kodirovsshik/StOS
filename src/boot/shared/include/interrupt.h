@@ -45,7 +45,7 @@ typedef struct
 
 _EXTERN_C_
 
-void interrupt(registers_info_t*, uint8_t vector);
+void interrupt(uint8_t vector, registers_info_t*);
 
 _EXTERN_C_END_
 

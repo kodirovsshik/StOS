@@ -27,6 +27,7 @@
 _EXTERN_C_
 
 uintptr_t heap_top;
+uintptr_t heap_limit;
 
 void* get_heap_top()
 {
@@ -36,12 +37,11 @@ void* get_heap_top()
 void* malloc(size_t n)
 {
 	if (n & 3)
-		n = (n | 3) + 1; //align up by four bytes
+		n = (n | 3) + 1; //align up to four byte granularity
 
-	static constexpr uintptr_t bound = 0x7C00;
 
 	uintptr_t new_top = heap_top + n;
-	if (new_top > bound)
+	if (new_top > heap_limit)
 	{
 		puts("\nError: bootloader is out of memory");
 		halt();

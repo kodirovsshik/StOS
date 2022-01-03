@@ -71,23 +71,29 @@ static_assert(sizeof(mbr_t) == 512);
 
 
 
+
 typedef struct
 {
-	uint8_t code[0x1AD];
+	char signature[8];
 
-	struct
+	union
 	{
-		char signature[8];
+		uint8_t verl, verh;
+		uint16_t version;
+	};
 
-		union
-		{
-			uint8_t verl, verh;
-			uint16_t version;
-		};
+	uint8_t size;
 
-		uint8_t size;
+} PACKED stos_loader_metadata_t;
 
-	} PACKED metadata;
+typedef struct
+{
+	uint8_t code1[3];
+	uint8_t oem[8];
+	uint8_t bpb[79];
+	uint8_t code2[0x153];
+
+	stos_loader_metadata_t metadata;
 
 	uint8_t uid[6];
 	mbr_entry_t table[4];
@@ -109,19 +115,7 @@ typedef struct
 	uint8_t bpb[79];
 	uint8_t code2[0x153];
 
-	struct
-	{
-		char signature[8];
-
-		union
-		{
-			uint8_t verl, verh;
-			uint16_t version;
-		};
-
-		uint8_t size;
-
-	} PACKED metadata;
+	stos_loader_metadata_t metadata;
 
 	uint8_t code3[70];
 

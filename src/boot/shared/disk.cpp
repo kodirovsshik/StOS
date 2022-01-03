@@ -27,12 +27,8 @@
 
 #include "disk.hpp"
 #include "gpt.h"
-//#include "io.h"
 
 
-
-//void* memset(void* dst, int val, size_t count);
-//void* memcpy(void* dest, const void* src, size_t count);
 
 static bool is_extended_type(uint8_t type)
 {
@@ -59,8 +55,7 @@ uint8_t disk_t::_init(uint8_t disk)
 		if (!drive_lba_supported(disk))
 			return ERR_NO_LBA;
 
-		if ((x = read_drive_lba(disk, 0, &t, 1)) != 0)
-			return ERR_READ;
+		read_guard(disk, 0, &t, 1);
 
 		if (t.signature != 0xAA55)
 			return ERR_NO_MBR;
@@ -70,9 +65,16 @@ uint8_t disk_t::_init(uint8_t disk)
 		if (strncmp(t.metadata.signature, "StOSboot", 8) == 0)
 			this->stos_mbr = true;
 
+		uint64_t extended_lba = 0;
+
 		for (int i = 0; i < 4; ++i)
 		{
-			if (t.table[i].type == 0xEE)
+			uint8_t type = t.table[i].type;
+			if (type == 0)
+				continue;
+			if (!this->has_gpt)
+				this->partitions_number = i + 1;
+			if (type == 0xEE)
 			{
 				if (this->has_gpt)
 					return ERR_CORRUPTED_PARTITION_TABLE;
@@ -93,6 +95,29 @@ uint8_t disk_t::_init(uint8_t disk)
 					break;
 				}
 			}
+			else if (is_extended_type(type))
+			{
+				uint32_t lba = t.table[i].start_lba;
+				if (lba == 0 || extended_lba != 0)
+					return ERR_CORRUPTED_PARTITION_TABLE;
+				extended_lba = lba;
+			}
+		}
+
+		uint32_t lba_offset = 0;
+		if (extended_lba != 0)
+		{
+			size_t n = 4;
+			while (true)
+			{
+				read_guard(disk, extended_lba + lba_offset, &t, 1);
+				if (t.table[0].type != 0)
+					this->partitions_number = ++n;
+				if (is_extended_type(t.table[1].type))
+					lba_offset = t.table[1].start_lba;
+				else
+					break;
+			}
 		}
 
 		stos_mbr_size = t.metadata.size;
@@ -105,7 +130,6 @@ uint8_t disk_t::_init(uint8_t disk)
 
 		if (this->has_gpt)
 		{
-			//TODO: search for global VBR in GPT
 			const char stos_gpt_signature[] = "StOS bootloader ";
 			static_assert(sizeof(stos_gpt_signature) == 17, "");
 
@@ -157,7 +181,7 @@ uint8_t disk_t::_init(uint8_t disk)
 				if (strncmp(vbr.metadata.signature, "StOSload", 8) != 0)
 					continue;
 
-				this->stos_vbr_partition = 0;
+				this->stos_vbr_partition = -1;
 				this->stos_vbr = true;
 				this->stos_vbr_version = vbr.metadata.version;
 			}

@@ -27,7 +27,7 @@
 #include "aux.h"
 #include "mbr.h"
 #include "multiloader.h"
-
+#include "smol_vec.hpp"
 
 
 typedef struct
@@ -36,52 +36,6 @@ typedef struct
 	uint8_t disk = 0xFF;
 	bool use_vbr : 1 = false;
 } boot_entry_t;
-
-//using partition_info_t = uint8_t;
-
-
-
-template<class T>
-struct smol_vec
-{
-	T* data;
-	size_t size;
-	size_t capacity;
-
-	static constexpr size_t capacity_step = 8;
-
-	void init(size_t cap)
-	{
-		this->data = (T*)malloc(cap * sizeof(T));
-		this->size = 0;
-		this->capacity = cap;
-	}
-
-	void push_back(const T& x)
-	{
-		if (this->size == this->capacity)
-		{
-			realloc(this->data, this->capacity, this->capacity + capacity_step);
-			this->capacity += capacity_step;
-		}
-		this->data[this->size++] = x;
-	}
-
-	T& operator[](size_t i)
-	{
-		return this->data[i];
-	}
-
-	void clear()
-	{
-		this->size = 0;
-	}
-	void deallocate()
-	{
-		free(this->data, this->capacity);
-		this->size = this->capacity = 0;
-	}
-};
 
 
 
@@ -127,9 +81,9 @@ void main()
 	endl();
 
 
-	uint32_t vbr_partition;
+	uint32_t vbr_partition = -1;
 	uint16_t vbr_ver = 0;
-	uint8_t vbr_disk;
+	uint8_t vbr_disk = -1;
 
 	disk_t* disks = (disk_t*)malloc((nf + nh) * sizeof(disk_t));
 #define disk_offset(x) ((x) <= nf ? (x) : ((x) - 0x80 + nf))
@@ -220,8 +174,8 @@ void main()
 				put32u(read_err_code);
 			else
 				puts("not available");
-			endl();
 		}
+		endl();
 		with_errors = true;
 	};
 
@@ -261,7 +215,7 @@ void main()
 			header.request_number = STOS_REQ_GET_MBR_BOOT_OPTIONS;
 			header.request_data = i;
 			header.mbr_version = (uint16_t)(uintptr_t)&MBR_VERSION;
-			header.free_memory_begin = (uint16_t)(uintptr_t)get_heap_top();
+			header.free_memory_begin = (uintptr_t)get_heap_top();
 
 			uint8_t x8 = 0xFE;
 			uint32_t x = invoke_vbr(vbr_disk, vbr_partition, &header, &x8);
@@ -355,38 +309,46 @@ uint32_t invoke_vbr(uint8_t disk_n, uint32_t partition, stos_request_header_t* h
 		return disk.init_status;
 
 	uint64_t lba;
-	uint32_t x;
+	uint32_t x; //last error
+	uint8_t mbr_size = 0;
 
-	auto it = disk.begin();
-	it.partition_number = partition;
+
+	{
+		mbr_bootloader_t mbr;
+		x = read_drive_lba(disk_n, 0, &mbr, 1);
+		if (x) return ERR_READ;
+		if (read_status) *read_status = disk.read_status;
+		if (mbr.signature != 0xAA55 || strncmp(mbr.metadata.signature, "StOSboot", 8) != 0)
+			return ERR_NO_MBR;
+		mbr_size = mbr.metadata.size;
+	}
 
 	if (disk.has_gpt)
 	{
-		{
-			gpt_partition_info_t info;
-			x = it.get_gpt_info(&info);
-			if (read_status) *read_status = disk.read_status;
-			if (x) return x;
-			lba = info.first;
-		}
+		auto it = disk.begin();
+		it.partition_number = partition;
 
-		{
-			mbr_bootloader_t mbr;
-			x = read_drive_lba(disk_n, 0, &mbr, 1);
-			if (x) return ERR_READ;
-			if (read_status) *read_status = disk.read_status;
-			if (mbr.signature != 0xAA55 || strncmp(mbr.metadata.signature, "StOSboot", 8) != 0)
-				return ERR_NO_MBR;
-			lba += mbr.metadata.size - 1;
-		}
+		gpt_partition_info_t info;
+		x = it.get_gpt_info(&info);
+		if (read_status) *read_status = disk.read_status;
+		if (x) return x;
+		lba = info.first + mbr_size - 1;
 	}
 	else
 	{
-		mbr_partition_info_t info;
-		x = it.get_mbr_info(&info);
-		if (read_status) *read_status = disk.read_status;
-		if (x) return x;
-		lba = info.lba;
+		if (partition != (uint32_t)-1)
+		{
+			auto it = disk.begin();
+			it.partition_number = partition;
+
+			mbr_partition_info_t info;
+			x = it.get_mbr_info(&info);
+			if (read_status) *read_status = disk.read_status;
+			if (x) return x;
+			lba = info.lba;
+		}
+		else
+			lba = mbr_size;
 	}
 
 	x = read_drive_lba(disk_n, lba, (void*)0x7C00, 2);
@@ -454,6 +416,7 @@ uint32_t _boot(uint32_t n, uint8_t vbr_disk, uint32_t vbr_partition, uint8_t* re
 		x = iter.get_mbr_entry(&e);
 		if (read_status) *read_status = disk.read_status;
 		if (x) return x;
+		e.active = aimd;
 		_mbr_transfer_control_flow(&e);
 	}
 	else
@@ -466,7 +429,8 @@ uint32_t _boot(uint32_t n, uint8_t vbr_disk, uint32_t vbr_partition, uint8_t* re
 		stos_request_header_t hdr;
 		hdr.struct_size = sizeof(hdr);
 		hdr.request_number = STOS_REQ_BOOT;
-		hdr.request_data = (uint16_t)(uintptr_t)&req_data;
+		hdr.request_data = (uint32_t)&req_data;
+		hdr.free_memory_begin = (uint32_t)get_heap_top();
 		return invoke_vbr(vbr_disk, vbr_partition, &hdr, read_status);
 	}
 }
@@ -501,7 +465,7 @@ const char* err_desc(int n)
 		"Partition not present",
 		"Read error",
 		"Uninitialized object",
-		"Zero partitions found",
+		"No partitions found",
 		"Invalid extended partition table",
 		"GPT is of an incompatible type",
 		"Corrupted partition table",

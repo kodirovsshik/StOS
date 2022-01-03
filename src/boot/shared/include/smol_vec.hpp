@@ -19,39 +19,53 @@
 
 
 
-#ifndef _IO_H_
-#define _IO_H_
+#ifndef _SMOL_VEC_HPP_
+#define _SMOL_VEC_HPP_
 
-
-#include <stdint.h>
-
-#include "defs.h"
+#include "memory.h"
 
 
 
-_EXTERN_C_
+template<class T>
+struct smol_vec
+{
+	T* data;
+	size_t size;
+	size_t capacity;
 
+	static constexpr size_t capacity_step = 8;
 
-void select_video_page(uint8_t n);
+	void init(size_t cap)
+	{
+		this->data = (T*)malloc(cap * sizeof(T));
+		this->size = 0;
+		this->capacity = cap;
+	}
 
-void cls();
-void puts(const char*);
-void putc(char);
-void endl();
-void put0x32x(uint32_t x);
-void put32x(uint32_t x);
-void put32u(uint32_t u);
-bool get32(uint32_t* dst, uint32_t max, uint32_t digits);
-bool get32u(uint32_t* dst, uint32_t max = 0xFFFFFFFF);
-void tabulate(int times);
+	void push_back(const T& x)
+	{
+		if (this->size == this->capacity)
+		{
+			realloc(this->data, this->capacity, this->capacity + capacity_step);
+			this->capacity += capacity_step;
+		}
+		this->data[this->size++] = x;
+	}
 
+	T& operator[](size_t i)
+	{
+		return this->data[i];
+	}
 
-uint16_t getch();
-uint16_t kbhit();
+	void clear()
+	{
+		this->size = 0;
+	}
+	void deallocate()
+	{
+		free(this->data, this->capacity);
+		this->size = this->capacity = 0;
+	}
+};
 
-
-_EXTERN_C_END_
-
-
-
-#endif //!_IO_H_
+#endif //!_SMOL_VEC_HPP_

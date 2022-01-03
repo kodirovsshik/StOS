@@ -1,4 +1,4 @@
-#if 0
+%if 0
 	  This file is a part of StOS project - a small operating system
 	  	made for learning purposes
 	  Copyright (C) 2021 Egorov Stanislav, kodirovsshik@mail.ru, kodirovsshik@gmail.com
@@ -15,43 +15,36 @@
 
 	  You should have received a copy of the GNU General Public License
 	  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#endif
+%endif
 
 
 
-#ifndef _IO_H_
-#define _IO_H_
+;//DS:SI = C string ptr
+puts16:
+	push ax
+	push bx
+	mov ah, 0x0E
+	mov bx, 0x0007
+	cld
+	test si, si
+	jnz .loop
+	mov si, .msg_null
+.loop:
+	lodsb
+	test al, al
+	jz .end
 
+	int 0x10
 
-#include <stdint.h>
+	cmp al, 10
+	jne .loop
 
-#include "defs.h"
-
-
-
-_EXTERN_C_
-
-
-void select_video_page(uint8_t n);
-
-void cls();
-void puts(const char*);
-void putc(char);
-void endl();
-void put0x32x(uint32_t x);
-void put32x(uint32_t x);
-void put32u(uint32_t u);
-bool get32(uint32_t* dst, uint32_t max, uint32_t digits);
-bool get32u(uint32_t* dst, uint32_t max = 0xFFFFFFFF);
-void tabulate(int times);
-
-
-uint16_t getch();
-uint16_t kbhit();
-
-
-_EXTERN_C_END_
-
-
-
-#endif //!_IO_H_
+	mov al, 13
+	int 0x10
+	jmp .loop
+.end:
+	pop bx
+	pop ax
+	ret
+.msg_null:
+db "(null)", 0

@@ -51,7 +51,7 @@ times 11 - ($ - entry) db 0x00
 
 
 bpb:
-times 79 - ($ - entry) db 0x00
+times 90 - ($ - entry) db 0x00
 
 code:
 	cli
@@ -66,13 +66,17 @@ code:
 	mov DS_BACKUP, ax
 	mov SI_BACKUP, si
 
-	mov cx, word [es:di]
-	mov word [ES_DI_BACKUP_AREA + 0], cx
-	mov cx, word [es:di + 2]
-	mov word [ES_DI_BACKUP_AREA + 2], cx
+	mov [ES_DI_BACKUP_AREA], di
+	mov ax, es
+	mov [ES_DI_BACKUP_AREA + 2], ax
 
 	xor di, di
 	mov es, di
+
+	mov di, DS_SI_BACKUP_AREA
+	mov cx, 8
+	rep movsw
+
 	mov di, 0x5A8
 	mov si, data.cmos_ports
 
@@ -93,7 +97,7 @@ code:
 	mov si, data.stosrequ
 	mov di, bx
 	mov cx, 8
-	repnz cmpsb
+	repe cmpsb
 
 	;//cmov goes brrrrrr
 	mov IS_STOS_REQ, 1
@@ -151,27 +155,12 @@ code:
 	;jmp .after_read
 
 .after_read:
-	call check_cpu
-	jc .err_cpu
 
 	jmp 0x0000:stage2
 
 .err_return_read:
 	mov eax, 0x80000002
 	retd
-
-.err_return_cpu:
-	mov eax, 0x80000003
-	retd
-
-.err_cpu:
-	cmp IS_STOS_REQ, 0
-	jne .err_return_cpu
-	mov bp, msg_incompatible_cpu
-	mov cx, msg_incompatible_cpu.end
-	stc
-	sbb cx, bp
-	jmp error
 
 .err_read:
 	mov cx, data.err_read_end - data.err_read
@@ -180,83 +169,10 @@ code:
 
 
 
-check_cpu:
-	;//Check for 8086/80186
-	push sp
-	pop ax
-	xor ax, sp
-	jnz .err
-	;//Got at least 80286
-
-	pushf
-	pop ax
-	or ax, 0xF000
-	push ax
-	popf
-
-	pushf
-	pop ax
-	test ax, 0xF000
-	jz .err
-	;//Got at least 80386
-
-	pushfd
-	pop eax
-	mov ecx, eax
-	xor eax, 1 << 18
-	push eax
-	popfd
-
-	pushfd
-	pop eax
-	xor eax, ecx
-	jz .err
-	;//Got at least 80486
-
-	mov eax, ecx
-	xor eax, 1 << 21
-	push eax
-	popfd
-
-	pushfd
-	pop eax
-	xor eax, ecx
-	jz .err
-	;//Got CPUID
-
-
-	;//Restore a nice value for EFLAGS
-	push dword (1 << 9)
-	popfd
-
-	xor eax, eax
-	cpuid
-	test eax, eax
-	jz .err
-	;//Got leaf 1
-
-	mov eax, 1
-	cpuid
-	test edx, 1 << 15 ;//test for CMOV
-	jz .err
-	;//Got CMOV
-
-	;//Do not check for 64 bit cpu cuz it is not necessary
-	;//to process MBR's requests other that boot StOS
-
-	clc
-	ret
-.err:
-	stc
-	ret
-
-
-
 error:
 	mov ax, 0x1301
 	mov bx, 0x000F
 	mov dx, 0
-	sti
 	int 0x10
 	;jmp halt
 
@@ -274,6 +190,7 @@ halt:
 aux:
 .int13read:
 	mov ah, 0x42
+	mov si, LBA_PACKET_AREA
 	clc
 	sti
 	int 0x13

@@ -26,7 +26,6 @@
 #include <stddef.h>
 
 #include "aux.h"
-//#include "multiloader.h"
 #include "mbr.h"
 
 

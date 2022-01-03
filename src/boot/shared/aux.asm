@@ -25,7 +25,7 @@ global memcmp
 global strncmp
 
 
-BITS 16
+BITS 32
 SECTION .text
 
 
@@ -46,34 +46,27 @@ memset:
 
 ;//cdecl
 ;//dword size
-;//dword byte value
+;//dword value
 ;//dword ptr
 memset32:
 	push edi
 
 	cld
-	mov di, word [esp + 8]
+
+	mov ecx, dword [esp + 16]
+	mov edx, ecx
+	shr ecx, 2
+	jz .ret
+
+	mov edi, dword [esp + 8]
 	mov eax, dword [esp + 12]
-	mov cx, word [esp + 16]
-
-	mov dx, cx
-	shr cx, 4
-
 	rep stosd
 
-	test dx, dx
+	mov ecx, edx
+	and ecx, 3
 	jz .ret
+	rep stosb
 
-	stosb
-	dec dx
-	jz .ret
-
-	shr eax, 8
-	stosb
-	dec dx
-	jz .ret
-
-	mov [di], ah
 .ret:
 	pop edi
 	mov eax, dword [esp + 4]
@@ -90,20 +83,23 @@ memcpy:
 	push edi
 
 	cld
-	mov esi, dword [esp + 16]
-	mov edi, dword [esp + 12]
+
 	mov ecx, dword [esp + 20]
-
-	mov eax, edi ;//we return dst
-
 	mov edx, ecx
 	shr ecx, 2
+	jz .ret
+
+	mov esi, dword [esp + 16]
+	mov edi, dword [esp + 12]
+	mov eax, edi ;//we return dst
 	rep movsd
 
-	mov cx, dx
-	and cx, 3
+	mov ecx, edx
+	and ecx, 3
+	jz .ret
 	rep movsb
 
+.ret:
 	pop esi
 	pop edi
 	retd
@@ -116,19 +112,14 @@ memcpy:
 ;//dword s1
 memcmp:
 strncmp:
-	push si
-	push di
-
-	xor si, si
-	mov di, si
-	mov es, di
+	push esi
+	push edi
 
 	cld
-	mov si, word [esp +  8]
-	mov di, word [esp + 12]
-	mov cx, word [esp + 16]
+	mov esi, dword [esp + 12]
+	mov edi, dword [esp + 16]
+	mov ecx, dword [esp + 20]
 	repe cmpsb
-
 
 	mov eax, 1
 	mov ecx, -1
@@ -139,6 +130,6 @@ strncmp:
 .zero:
 	xor eax, eax
 .ret:
-	pop di
-	pop si
+	pop edi
+	pop esi
 	retd
