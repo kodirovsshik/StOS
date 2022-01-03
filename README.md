@@ -49,19 +49,14 @@ To build everything, run
 make
 ```
 
-Then create a small raw hard drive image in ./system by running
+Then you will need to create a partition table and some drive, you can do this by running
 ```bash
-make system_wipe
-```
-
-Then you will need to create an MBR partition table, you can do this by running
-```bash
-make system_reset_mbr
+make system_create_dummy_disk_layout
 ```
 
 Then, to actually write everything you've built to the disk, run
 ```bash
-make system_burn_mbr
+make system_burn
 ```
 
 Finally, we are ready to run the result. To do this (in QEMU), run
