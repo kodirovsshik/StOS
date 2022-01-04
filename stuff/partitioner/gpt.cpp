@@ -28,9 +28,12 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
+#include <locale.h>
+#include <uchar.h>
 
 #include <chrono>
 #include <utility>
+#include <iterator>
 
 
 
@@ -65,7 +68,7 @@ R"(create command - create new GPT entry:
 )";
 
 const char* usage_set =
-R"(table command - set a GPT entry data:
+R"(set command - set a GPT entry data:
 	%s path/to/disk set N X Y
 	Action: GPT[N].X = Y
 )";
@@ -158,11 +161,11 @@ void update_gpt(bool primary)
 	uint32_t partition_table_crc = crc32_init();
 	for (uint32_t i = 0; i < partition_table_size; ++i)
 	{
-		if ((i & 3) == 0)
+		if ((i % 4) == 0)
 		{
 			check(fread(&table, 1, 512, disk_f) == 512, ERR_READ, "Read error on %s", argv1);
 		}
-		partition_table_crc = crc32_update(&table[i & 3], 128, partition_table_crc);
+		partition_table_crc = crc32_update(&table[i % 4], 128, partition_table_crc);
 	}
 
 	header.partition_table_crc = partition_table_crc;
@@ -224,8 +227,8 @@ void create_protective_mbr()
 
 	memset(&mbr, 0, sizeof(mbr));
 
-	pmbre.start_chs.sec = 1;
-	pmbre.end_chs.head = 0xFE;
+	pmbre.start_chs.sec = 2;
+	pmbre.end_chs.head = 0xFF;
 	pmbre.end_chs.sec = 63;
 	pmbre.end_chs.cyl = 1023;
 	pmbre.start_lba = 1;
@@ -273,19 +276,182 @@ int command_table(int argc, const char* const* argv)
 	return 0;
 }
 
+uint64_t get_partition_table_offset(uint32_t partition_number)
+{
+	gpt_header_t hdr;
+	fseek(disk_f, 512, SEEK_SET);
+	check(fread(&hdr, 1, 512, disk_f) == 512, ERR_READ, "Read error on %s", argv1);
+
+	return 512 * (hdr.partition_table_begin + partition_number / 4);
+}
+
 int command_create(int argc, const char* const* argv)
 {
-	if (argc < 3 || argc > 4)
+	if (argc != 3)
 	{
 		fprintf(stderr, usage_create, argv0);
 		return ERR_ARGS_COUNT;
 	}
 
-	//char guid[17] = "StOS SystemFiles";
-	return -1;
+	uint64_t first_lba, last_lba, table_lba;
+	uint32_t partition_number;
+	check(sscanf(argv[0], "%u", &partition_number) == 1, ERR_ARGS, "Invalid partition number: %s", argv[0]);
+	check(sscanf(argv[1], "%llu", &first_lba) == 1, ERR_ARGS, "Invalid LBA: %s", argv[1]);
+	check(sscanf(argv[2], "%llu", &last_lba) == 1, ERR_ARGS, "Invalid LBA: %s", argv[2]);
+
+	table_lba = get_partition_table_offset(partition_number);
+
+	gpt_entry_t table[4];
+	fseek(disk_f, (long)table_lba, SEEK_SET);
+	check(fread(&table, 1, 512, disk_f) == 512, ERR_READ, "Read error on %s", argv1);
+
+	gpt_entry_t& partition_entry = table[partition_number % 4];
+	for (auto& x : partition_entry.partition_guid)
+		x = uint8_t(rand());
+
+	partition_entry.first_lba = first_lba;
+	partition_entry.last_lba = last_lba;
+
+	fseek(disk_f, (long)table_lba, SEEK_SET);
+	check(fwrite(&table, 1, 512, disk_f) == 512, ERR_READ, "Write error on %s", argv1);
+	fflush(disk_f);
+
+	update_gpt();
+	return 0;
 }
 
+int extract_guid_le(char* dst, const char* src)
+{
+	check(strlen(src) == 32, ERR_ARGS, "GUID in little endian must be 32 hex digits");
 
+	auto extract_hex_digit = []
+	(char c)
+	{
+		if (c >= '0' && c <= '9')
+			return c - '0';
+		if (c >= 'a' && c <= 'f')
+			return c - 'a' + 10;
+		if (c >= 'A' && c <= 'F')
+			return c - 'A' + 10;
+		return -1;
+	};
+
+	for (int i = 0; i < 32; i += 2)
+	{
+		uint8_t x = 0;
+		for (int j = i; j < i + 2; ++j)
+		{
+			x *= 16;
+			int d = extract_hex_digit(src[j]);
+			check(d >= 0, ERR_ARGS, "Invalid hex digit: %c", src[i]);
+		}
+		*dst++ = char(x);
+	}
+
+	return 0;
+}
+
+int subcommand_set_type_str(const char* value, gpt_entry_t& entry)
+{
+	check(strlen(value) == 16, ERR_ARGS, "GUID str must be 16 characters long");
+	memcpy(entry.type_guid, value, 16);
+	return 0;
+}
+int subcommand_set_type_le(const char* value, gpt_entry_t& entry)
+{
+	return extract_guid_le(entry.type_guid, value);
+}
+int subcommand_set_guid_str(const char* value, gpt_entry_t& entry)
+{
+	check(strlen(value) == 16, ERR_ARGS, "GUID str must be 16 characters long");
+	memcpy(entry.partition_guid, value, 16);
+	return 0;
+}
+int subcommand_set_guid_le(const char* value, gpt_entry_t& entry)
+{
+	return extract_guid_le(entry.partition_guid, value);
+}
+int subcommand_set_first(const char* str, gpt_entry_t& entry)
+{
+	uint64_t value;
+	check(sscanf(str, "%llu", &value) == 1, ERR_ARGS, "Invalid LBA: %s", str);
+	entry.first_lba = value;
+	return 0;
+}
+int subcommand_set_last(const char* str, gpt_entry_t& entry)
+{
+	uint64_t value;
+	check(sscanf(str, "%llu", &value) == 1, ERR_ARGS, "Invalid LBA: %s", str);
+	entry.last_lba = value;
+	return 0;
+}
+int subcommand_set_name(const char* str, gpt_entry_t& entry)
+{
+	memset(&entry.name, 0, sizeof(entry.name));
+	setlocale(LC_ALL, "");
+
+	mbstate_t state{};
+	size_t len = strlen(str) + 1;
+	for (size_t rdi = 0; true; ++rdi)
+	{
+		check(rdi < std::size(entry.name), ERR_ARGS, "Unicode string must not exceed 32 UTF-16 code points");
+
+		char16_t c;
+		size_t result = mbrtoc16(&c, str, len, &state);
+		if (result == 0)
+			break;
+		if (result == (size_t)-3)
+			result = 0;
+
+		check(result >= 0, ERR_ARGS, "Unicode conversion failed");
+
+		str += result;
+		len -= result;
+		entry.name[rdi] = c;
+	}
+
+	return 0;
+}
+
+int command_set(int argc, const char* const* argv)
+{
+	const std::pair<const char*, int(*)(const char*, gpt_entry_t&)> handlers[] =
+	{
+		{ "type_str", subcommand_set_type_str },
+		{ "type_le",  subcommand_set_type_le },
+		{ "guid_str", subcommand_set_guid_str },
+		{ "guid_le",  subcommand_set_guid_le },
+		{ "first",    subcommand_set_first },
+		{ "last",     subcommand_set_last },
+		{ "name",     subcommand_set_name },
+	};
+
+	uint32_t partition_number;
+	check(sscanf(argv[0], "%u", &partition_number) == 1, ERR_ARGS, "Invalid partition number: %s", argv[0]);
+	uint64_t table_offset = get_partition_table_offset(partition_number);
+
+	gpt_entry_t table[4];
+	fseek(disk_f, (long)table_offset, SEEK_SET);
+	check(fread(&table, 1, 512, disk_f) == 512, ERR_READ, "Read error on %s", argv1);
+
+	int result = ERR_ARGS;
+
+	for (const auto& [cmd, handler] : handlers)
+	{
+		if (strcmp(cmd, argv[1]) == 0)
+		{
+			result = handler(argv[2], table[partition_number % 4]);
+			break;
+		}
+	}
+
+	fseek(disk_f, (long)table_offset, SEEK_SET);
+	check(fwrite(&table, 1, 512, disk_f) == 512, ERR_READ, "Write error on %s", argv1);
+	fflush(disk_f);
+
+	update_gpt();
+	return 0;
+}
 //commands:
 //table #n
 //create #n first last
@@ -299,19 +465,24 @@ int command_create(int argc, const char* const* argv)
 int main(int argc, const char* const* argv)
 {
 	using namespace std::chrono;
+	//I like chrono lib
 	srand((unsigned)duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count());
 	argv0 = argv[0];
 
+	/*
 	const char* const _argv[] =
 	{
 		nullptr,
-		"/home/kodirovsshik/os6/system/drive",
-		"table",
-		"128",
+		"/home/kodirovsshik/os6/system/disk",
+		"create",
+		"0",
+		"36",
+		"39"
 	};
 
-	//argv = _argv;
-	//argc = sizeof(_argv) / sizeof(char*);
+	argv = _argv;
+	argc = sizeof(_argv) / sizeof(char*);
+	//*/
 
 	if (argc < 3)
 	{
@@ -326,8 +497,8 @@ int main(int argc, const char* const* argv)
 	const std::pair<const char*, int(*)(int, const char* const*)> handlers[] =
 	{
 		{ "table",  command_table },
-		//{ "create", command_create },
-		//{ "set",    command_set },
+		{ "create", command_create },
+		{ "set",    command_set },
 		//{ "delete", command_delete },
 		//{ "zero",   command_zero },
 		//{ "wipe",   command_wipe },
