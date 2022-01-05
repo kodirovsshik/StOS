@@ -64,5 +64,10 @@ typedef struct
 static_assert(sizeof(gpt_entry_t) == 128);
 
 
+#define GPT_FLAG_PLATFORM_REQUIRED (1 << 0)
+#define GPT_FLAG_EFI_IGNORE (1 << 1)
+#define GPT_FLAG_BIOS_BOOTABLE (1 << 2)
+
+
 
 #endif //!_GPT_H_

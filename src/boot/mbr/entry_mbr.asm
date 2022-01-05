@@ -27,7 +27,7 @@ extern heap_top
 
 
 
-SECTION .boot_sector_text
+SECTION .boot
 BITS 16
 
 
@@ -58,7 +58,7 @@ times 79 db 0x00
 
 	sti
 	mov ax, 0x0003
-	int 0x10
+	;int 0x10
 
 	mov ax, 0x0200 + __bootloader_size_sectors
 	mov bx, 0x0600

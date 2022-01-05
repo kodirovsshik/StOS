@@ -32,24 +32,41 @@
 
 typedef struct
 {
-	uint32_t partition;
+	uint32_t partition = 0xFFFFFFFF;
 	uint8_t disk = 0xFF;
 	bool use_vbr : 1 = false;
 } boot_entry_t;
 
+typedef struct
+{
+	uint32_t partition;
+	uint16_t version = 0;
+	uint8_t disk;
+} vbr_info_t;
+
 
 
 smol_vec<boot_entry_t> boot_options;
+bool with_errors = false;
+disk_t* disks = nullptr;
+int number_of_hdds;
+int number_of_floppies;
+#define disk_offset(x) ((x) <= number_of_floppies ? (x) : ((x) - 0x80 + number_of_floppies))
 
 
 
 extern "C" uint32_t _invoke_vbr_helper(stos_request_header_t*, uint8_t disk, mbr_entry_t*);
-uint32_t _boot(uint32_t n, uint8_t vbr_disk, uint32_t vbr_partition, uint8_t* read_status);
+uint32_t _boot(uint32_t n, const vbr_info_t&, uint8_t* read_status);
 int next_disk(int);
 int digits_count(uint32_t);
 const char* err_desc(int);
 uint32_t invoke_vbr(uint8_t disk, uint32_t partition, stos_request_header_t*, uint8_t* read_status);
 bool is_non_fatal_floppy(uint8_t disk, uint8_t status);
+void print_partition_info(uint8_t disk, uint32_t partition, uint32_t boot_number = 0, uint8_t tabulation = 0);
+void add_boot_option(uint8_t disk, uint32_t partition, bool use_stos_vbr);
+void process_error(const char* msg, uint32_t err_code, uint8_t read_err_code);
+bool find_newest_vbr(vbr_info_t&);
+const char* get_disk_size_string(uint8_t disk);
 
 
 
@@ -57,23 +74,22 @@ bool is_non_fatal_floppy(uint8_t disk, uint8_t status);
 void main()
 {
 	puts("StOS loader v1.0\n");
-	const int nh = get_disks_count();
-	const int nf = get_floppies_count();
-	bool with_errors = false;
 
+	number_of_hdds = get_disks_count();
 	puts("Detected ");
-	put32u(nh);
-	puts(" hard disk disk");
-	if (nh != 1)
+	put32u(number_of_hdds);
+	puts(" hard drive disk");
+	if (number_of_hdds != 1)
 		putc('s');
 	endl();
 
-	if (nf)
+	number_of_floppies = get_floppies_count();
+	if (number_of_floppies)
 	{
 		puts("Detected ");
-		put32u(nf);
+		put32u(number_of_floppies);
 		puts(" floppy disk");
-		if (nf != 1)
+		if (number_of_floppies != 1)
 			putc('s');
 		endl();
 	}
@@ -81,36 +97,14 @@ void main()
 	endl();
 
 
-	uint32_t vbr_partition = -1;
-	uint16_t vbr_ver = 0;
-	uint8_t vbr_disk = -1;
 
-	disk_t* disks = (disk_t*)malloc((nf + nh) * sizeof(disk_t));
-#define disk_offset(x) ((x) <= nf ? (x) : ((x) - 0x80 + nf))
+	disks = (disk_t*)malloc((number_of_floppies + number_of_hdds) * sizeof(disk_t));
 
 	for (int i = DISK_BEGIN; i != DISK_END; i = next_disk(i))
-	{
-		disk_t &disk = disks[disk_offset(i)];
-		uint8_t x = disk.init(i);
+		disks[disk_offset(i)].init(i);
 
-		if (x != 0 && !is_non_fatal_floppy(i, x))
-			with_errors = true;
-
-		if (x == ERR_NO_MBR || x == ERR_NO_LBA)
-			continue;
-
-		if (!disk.stos_vbr)
-			continue;
-
-		if (disk.stos_vbr_version <= vbr_ver)
-			continue;
-
-		vbr_ver = disk.stos_vbr_version;
-		vbr_disk = i;
-		vbr_partition = disk.stos_vbr_partition;
-	}
-
-	if (vbr_ver == 0)
+	vbr_info_t vbr;
+	if (!find_newest_vbr(vbr))
 	{
 		puts("Warning: StOS global VBR not found in the system\n\n");
 		with_errors = true;
@@ -120,155 +114,137 @@ void main()
 
 	boot_options.init(8);
 
-	auto print_partition_info = []
-	(uint8_t disk, uint32_t partition, uint32_t boot_number, uint8_t tabulation = 0)
-	{
-		if (boot_number)
-		{
-			tabulate(tabulation);
-			putc('[');
-			put32u(boot_number);
-			puts("] ");
-		}
-		else
-			tabulate(tabulation + 3 + digits_count(boot_number));
-
-		if (disk >= 0x80)
-		{
-			puts("Disk ");
-			put32u(disk - 0x80 + 1);
-		}
-		else
-		{
-			puts("Floppy ");
-			put32u(disk + 1);
-		}
-
-		if (partition)
-		{
-			puts(" Partition ");
-			put32u(partition);
-		}
-		else if (disk == get_boot_disk())
-			puts(" (current)");
-	};
-
-	auto add_boot_option = [&]
-	(uint8_t disk, uint32_t partition, bool use_stos_vbr)
-	{
-		boot_options.push_back({ partition, disk, use_stos_vbr });
-		print_partition_info(disk, partition, boot_options.size);
-		endl();
-	};
-
-	auto process_error = [&]
-	(const char* msg, uint32_t err_code, uint8_t read_err_code)
-	{
-		puts(msg);
-
-		puts((err_code & 0x80000000) ? get_vbr_invoke_error_desc(err_code) : err_desc(err_code));
-		if (err_code == ERR_READ)
-		{
-			puts(", error code ");
-			if (read_err_code != 0xFE)
-				put32u(read_err_code);
-			else
-				puts("not available");
-		}
-		endl();
-		with_errors = true;
-	};
-
 	for (int i = DISK_BEGIN; i != DISK_END; i = next_disk(i))
 	{
-		disk_t disk;
-		disk.init(i);
+		disk_t& disk = disks[disk_offset(i)];
 
 		if (disk.init_status == 0 && disk.has_mbr && disk.bios_number != get_boot_disk())
-			add_boot_option(i, 0, true);
-		else if (disk.init_status == 0)
-		{
-			print_partition_info(i, 0, false);
-			endl();
-		}
+			add_boot_option(i, 0xFFFFFFFF, false);
 
 		if (disk.init_status != 0)
 		{
-			print_partition_info(i, 0, false);
 			if (!is_non_fatal_floppy(i, disk.init_status))
 			{
+				print_partition_info(i, -1);
 				puts(": ");
 				puts(err_desc(disk.init_status));
+				endl();
+
 				with_errors = true;
 			}
-			endl();
 			continue;
 		}
 
 		stos_boot_list_t* list = nullptr;
 		uint32_t list_top = 0;
 
-		if (vbr_ver != 0)
+		if (vbr.version != 0)
 		{
 			stos_request_header_t header;
 			header.struct_size = sizeof(header);
 			header.request_number = STOS_REQ_GET_MBR_BOOT_OPTIONS;
 			header.request_data = i;
-			header.mbr_version = (uint16_t)(uintptr_t)&MBR_VERSION;
+			header.mbr_version = (uintptr_t)&MBR_VERSION;
 			header.free_memory_begin = (uintptr_t)get_heap_top();
 
 			uint8_t x8 = 0xFE;
-			uint32_t x = invoke_vbr(vbr_disk, vbr_partition, &header, &x8);
+			uint32_t x = invoke_vbr(vbr.disk, vbr.partition, &header, &x8);
 			if (x != STOS_REQ_INVOKE_SUCCESS)
 			{
 				process_error("Subroutine invoke error: ", x, x8);
 			}
 			else
 			{
-				list = (stos_boot_list_t*)(uintptr_t)header.request_data;
+				list = (stos_boot_list_t*)header.request_data;
 			}
 		}
 
-		for (auto it = disk.begin(); it.valid(); it.next())
+		for (auto iter = disk.begin(); iter.valid(); iter.next())
 		{
-			mbr_partition_info_t info;
-			uint32_t x = it.get_mbr_info(&info);
-			if (x == ERR_NO_PARTITION)
-				continue;
-			if (x != ERR_WRONG_PARTITION_TABLE_TYPE)
-			{
-				print_partition_info(disk.bios_number, it.partition_number + 1, 0);
-				puts(": ");
-				puts(err_desc(x));
-				endl();
-				continue;
-			}
-
-			stos_boot_list_t::entry_t* current = list ? &list->arr[list_top] : nullptr;
-			bool in_list = (list && current->n == it.partition_number);
-
-			if (info.active || (list && current->status == bootability_status_t::bootable))
-				add_boot_option(i, it.partition_number, in_list);
-			else
-			{
-				print_partition_info(disk.bios_number, it.partition_number + 1, 0);
-				endl();
-			}
+			stos_boot_list_t::entry_t* current_boot_list_entry = list ? &list->arr[list_top] : nullptr;
+			bool in_list = (list && current_boot_list_entry->n == iter.partition_number);
 
 			if (in_list && ++list_top == list->size)
 			{
 				list_top = 0;
 				list = list->next;
 			}
+
+			uint32_t status;
+
+			bool partition_present = false;
+			bool active = false;
+			if (disk.has_gpt)
+			{
+				static uint8_t zero16[16] = { 0 };
+
+				gpt_entry_t info;
+				status = iter.get_gpt_entry(&info);
+				if (status == 0)
+				{
+					partition_present =
+						memcmp(info.type_guid, zero16, 16) != 0 &&
+						memcmp(info.partition_guid, zero16, 16) != 0;
+					active = info.flags & GPT_FLAG_BIOS_BOOTABLE;
+				}
+			}
+			else
+			{
+				mbr_entry_t info;
+				status = iter.get_mbr_entry(&info);
+				if (status == 0)
+				{
+					partition_present = info.type != 0;
+					active = info.active & 0x80;
+				}
+			}
+
+			if (!partition_present)
+				continue;
+
+			if (status == 0)
+			{
+				if (active || (in_list && current_boot_list_entry->status == bootability_status_t::bootable))
+					add_boot_option(i, iter.partition_number, in_list);
+			}
+			else
+			{
+				print_partition_info(disk.bios_number, iter.partition_number + 1, 0);
+				puts(": ");
+				puts(err_desc(status));
+				continue;
+			}
 		}
 	}
 
-	if (!with_errors && boot_options.size == 1)
+	if (boot_options.size > 1 || (boot_options.size == 1 && with_errors))
+	{
+		int last_disk_number = -1;
+		puts("Boot options list:\n");
+		for (size_t i = 0; i < boot_options.size; ++i)
+		{
+			auto& current_option = boot_options[i];
+			bool is_disk = current_option.partition == 0xFFFFFFFF;
+
+			if ((int)current_option.disk != last_disk_number)
+			{
+				if (!is_disk)
+				{
+					print_partition_info(current_option.disk, -1);
+					endl();
+				}
+				last_disk_number = current_option.disk;
+			}
+			print_partition_info(current_option.disk, current_option.partition, i + 1, (int)!is_disk);
+			endl();
+		}
+	}
+	else if (boot_options.size == 1)
 	{
 		puts("Single valid bootloader detected\n");
 		uint8_t rd = 0xFE;
 		uint32_t x;
-		x = _boot(1, vbr_disk, vbr_partition, &rd);
+		x = _boot(1, vbr, &rd);
 		process_error("Boot error: ", x, rd);
 		boot_options.clear();
 	}
@@ -295,17 +271,207 @@ void main()
 			_mbr_return();
 
 		uint8_t x8;
-		x = _boot(x, vbr_disk, vbr_partition, &x8);
+		x = _boot(x, vbr, &x8);
 		process_error("Boot error: ", x, x8);
 	}
 }
 
 
 
+const char* get_disk_size_string(uint8_t disk)
+{
+	static const char* units[] =
+	{ "B", "KiB", "MiB", "GiB" };
+
+	static char str[28];
+
+	uint64_t bytes = 0;
+
+	if (disk_lba_supported(disk))
+	{
+		struct
+		{
+			uint16_t size;
+			uint16_t flags;
+			uint32_t num_phys_cylinders;
+			uint32_t num_phys_heads;
+			uint32_t num_phys_sectors;
+			uint64_t sectors;
+			uint16_t bytes_per_sector;
+		} disk_data;
+
+		disk_data.size = sizeof(disk_data);
+
+		registers_info_t regs;
+		regs.eax = 0x4800;
+		regs.edx = disk;
+		regs.esi = (uint32_t)&disk_data;
+
+		interrupt(0x13, &regs);
+
+		const uint8_t ah = uint8_t(regs.eax >> 8);
+		if (ah == 0)
+			bytes = disk_data.sectors * disk_data.bytes_per_sector;
+	}
+
+	if (bytes == 0)
+	{
+		registers_info_t regs;
+		regs.eax = 0x15FF;
+		regs.edx = disk | 0xFFFFFF00;
+		regs.ecx = 0xFFFFFFFF;
+
+		const uint16_t old_dx = (uint16_t)regs.edx;
+		const uint16_t old_cx = (uint16_t)regs.ecx;
+
+		interrupt(0x13, &regs);
+
+		const uint16_t cx = uint16_t(regs.ecx);
+		const uint16_t dx = uint16_t(regs.edx);
+		const uint16_t ax = uint16_t(regs.eax);
+		const uint8_t ah = uint8_t(ax >> 8);
+		const bool is_valid_disk = (ah == 3) || (ax == 3);
+
+		if (is_valid_disk && !(cx == old_cx && dx == old_dx))
+			bytes = uint64_t(cx * 65536 + dx) * 512;
+	}
+
+	if (bytes == 0)
+		return "unknown size";
+
+	size_t unit_index = 0;
+	const size_t max_unit = countof(units) - 1;
+	uint64_t value = bytes;
+	while (unit_index < max_unit && value >= 1024)
+	{
+		value = (value / 1024) + bool((value % 1024) >= 512);
+		unit_index++;
+	}
+
+	char* p_buffer = str + countof(str);
+	*--p_buffer = '\0';
+
+	const char* unit = units[unit_index];
+	size_t unit_name_length = strlen(unit);
+	p_buffer -= unit_name_length;
+
+	memcpy(p_buffer, unit, unit_name_length);
+	*--p_buffer = ' ';
+
+	while (value)
+	{
+		uint32_t q, r;
+		divmod64_32(value, 10, &q, &r);
+		*--p_buffer = char(r + '0');
+		value = q;
+	}
+
+	return p_buffer;
+}
+
+
+
+bool find_newest_vbr(vbr_info_t& vbr)
+{
+	vbr.version = 0;
+
+	for (int i = DISK_BEGIN; i != DISK_END; i = next_disk(i))
+	{
+		disk_t &disk = disks[disk_offset(i)];
+		uint8_t x = disk.init_status;
+
+		if (x != 0 && !is_non_fatal_floppy(i, x))
+			with_errors = true;
+
+		if (x == ERR_NO_MBR || x == ERR_NO_LBA)
+			continue;
+
+		if (!disk.stos_vbr)
+			continue;
+
+		if (disk.stos_vbr_version <= vbr.version)
+			continue;
+
+		vbr.disk = i;
+		vbr.partition = disk.stos_vbr_partition;
+		vbr.version = disk.stos_vbr_version;
+	}
+
+	return vbr.version != 0;
+}
+
+
+
+void add_boot_option(uint8_t disk, uint32_t partition, bool use_stos_vbr)
+{
+	boot_options.push_back({ partition, disk, use_stos_vbr });
+};
+
+
+
+void process_error(const char* msg, uint32_t err_code, uint8_t read_err_code)
+{
+	puts(msg);
+
+	puts((err_code & 0x80000000) ? get_vbr_invoke_error_desc(err_code) : err_desc(err_code));
+	if (err_code == ERR_READ)
+	{
+		puts(", error code ");
+		if (read_err_code != 0xFE)
+			put32u(read_err_code);
+		else
+			puts("not available");
+	}
+	endl();
+	with_errors = true;
+};
+
+
+
+void print_partition_info(uint8_t disk, uint32_t partition, uint32_t boot_number, uint8_t tabulation)
+{
+	if (boot_number)
+	{
+		tabulate(tabulation);
+		putc('[');
+		put32u(boot_number);
+		puts("] ");
+	}
+	else
+		tabulate(tabulation + 3 + digits_count(boot_number));
+
+	if (disk >= 0x80)
+	{
+		puts("Disk ");
+		put32u(disk - 0x80 + 1);
+	}
+	else
+	{
+		puts("Floppy ");
+		put32u(disk + 1);
+	}
+
+	if (partition != 0xFFFFFFFF)
+	{
+		puts(" Partition ");
+		put32u(partition);
+	}
+	else
+	{
+		puts(" (");
+		puts(get_disk_size_string(disk));
+		putc(')');
+		if (disk == get_boot_disk())
+			puts(" (current)");
+	}
+};
+
+
+
 uint32_t invoke_vbr(uint8_t disk_n, uint32_t partition, stos_request_header_t* hdr, uint8_t* read_status)
 {
-	disk_t disk;
-	if (disk.init(disk_n) != 0)
+	disk_t &disk = disks[disk_offset(disk_n)];
+	if (disk.init_status != 0)
 		return disk.init_status;
 
 	uint64_t lba;
@@ -364,76 +530,68 @@ uint32_t invoke_vbr(uint8_t disk_n, uint32_t partition, stos_request_header_t* h
 	return _invoke_vbr_helper(hdr, disk_n, &entry);
 }
 
-uint32_t _boot(uint32_t n, uint8_t vbr_disk, uint32_t vbr_partition, uint8_t* read_status)
+
+uint32_t _boot(uint32_t n, const vbr_info_t& vbr, uint8_t* read_status)
 {
 	auto& entry = boot_options[n - 1];
 
-	//aim's partition
-	uint32_t aimp = entry.use_vbr ? vbr_partition : entry.partition;
-	uint8_t aimd = entry.use_vbr ? vbr_disk : entry.disk;
-	//aim's disk
-
-	disk_t disk;
-	disk.init(aimd);
-	if (disk.init_status != 0)
-	{
-		if (read_status) *read_status = disk.read_status;
-		return disk.init_status;
-	}
-
-	auto iter = disk.begin();
-	iter.partition_number = aimp;
-
-	uint64_t aiml; //aim's lba
-	uint32_t x;
-	if (disk.has_gpt)
-	{
-		gpt_partition_info_t info;
-		x = iter.get_gpt_info(&info);
-		if (read_status) *read_status = disk.read_status;
-		if (x) return x;
-		aiml = info.first;
-	}
-	else
-	{
-		mbr_partition_info_t info;
-		x = iter.get_mbr_info(&info);
-		if (read_status) *read_status = disk.read_status;
-		if (x) return x;
-		aiml = info.lba;
-	}
-
-	if (!entry.use_vbr)
-	{
-		x = read_disk_lba(entry.disk, aiml, (void*)0x7C00, 2);
-		if (x && read_status) *read_status = x;
-		if (x) return ERR_READ;
-
-		if (disk.has_gpt)
-			return ERR_WRONG_PARTITION_TABLE_TYPE;
-
-		mbr_entry_t e;
-		x = iter.get_mbr_entry(&e);
-		if (read_status) *read_status = disk.read_status;
-		if (x) return x;
-		e.active = aimd;
-		_mbr_transfer_control_flow(&e);
-	}
-	else
+	if (entry.use_vbr)
 	{
 		stos_boot_req_data_t req_data;
 		req_data.partition = entry.partition;
 		req_data.disk = entry.disk;
-		req_data.is_gpt = disk.has_gpt;
 
 		stos_request_header_t hdr;
 		hdr.struct_size = sizeof(hdr);
 		hdr.request_number = STOS_REQ_BOOT;
 		hdr.request_data = (uint32_t)&req_data;
 		hdr.free_memory_begin = (uint32_t)get_heap_top();
-		return invoke_vbr(vbr_disk, vbr_partition, &hdr, read_status);
+		return invoke_vbr(vbr.disk, vbr.partition, &hdr, read_status);
+	}
+	else
+	{
+		mbr_entry_t e;
+		uint64_t lba = 0;
+		uint8_t x;
+		const bool have_actual_partition = entry.partition != 0xFFFFFFFF;
+
+		if (have_actual_partition)
+		{
+			memset(&e, 0, sizeof(e));
+			disk_t &disk = disks[disk_offset(entry.disk)];
+			auto iter = disk.begin();
+			iter.partition_number = entry.partition;
+
+			if (disk.has_gpt)
+			{
+				gpt_entry_t info;
+				x = iter.get_gpt_entry(&info);
+				lba = info.first_lba;
+
+				e.start_lba = (uint32_t)info.first_lba;
+				e.count_lba = (uint32_t)(info.last_lba - info.first_lba + 1);
+			}
+			else
+			{
+				x = iter.get_mbr_entry(&e);
+				lba = e.start_lba;
+			}
+
+			if (read_status)
+				*read_status = disk.read_status;
+			if (x)
+				return x;
+		}
+
+		x = read_disk_lba(entry.disk, lba, (void*)0x7C00, 2);
+		if (x && read_status) *read_status = x;
+		if (x) return ERR_READ;
+
+		e.active = entry.disk;
+		_mbr_transfer_control_flow(&e);
 	}
 }
+
 
 
 int digits_count(uint32_t x)

@@ -31,7 +31,7 @@ extern stage2
 global entry
 
 
-SECTION .boot_sector_text
+SECTION .boot
 BITS 16
 
 

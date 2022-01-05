@@ -127,8 +127,11 @@ STOS_LOADER_OBJS += temp/boot/shared/cpuid.asm.elf32
 STOS_LOADER_MBR_OBJS := $(STOS_LOADER_OBJS)
 STOS_LOADER_GPT_OBJS := $(STOS_LOADER_OBJS)
 
-STOS_LOADER_MBR_OBJS += temp/boot/mbr/entry_mbr.asm.elf32
-STOS_LOADER_GPT_OBJS += temp/boot/mbr/entry_gpt.asm.elf32
+STOS_LOADER_ENTRY_MBR_OBJ := temp/boot/mbr/entry_mbr.asm.elf32
+STOS_LOADER_ENTRY_GPT_OBJ := temp/boot/mbr/entry_gpt.asm.elf32
+
+STOS_LOADER_MBR_OBJS += $(STOS_LOADER_ENTRY_MBR_OBJ)
+STOS_LOADER_GPT_OBJS += $(STOS_LOADER_ENTRY_GPT_OBJ)
 
 
 STOS_LOADER_MBR_ELF := result/bootloader_mbr.elf
@@ -227,14 +230,20 @@ host_boot:
 
 
 
+define create_loader
+	$(LINK32) -T $(1)
+endef
+
 $(STOS_LOADER_MBR_RAW): $(STOS_LOADER_MBR_OBJS)
 	$(LINK32) -T src/link/bootmgr.ld $^ -o $(STOS_LOADER_MBR_ELF)
+	#$(LINK32) -T src/link/boot_sector_dummy.ld $(STOS_LOADER_ENTRY_MBR_OBJ) -o $(STOS_LOADER_MBR_ELF).bootsector
 	$(OBJCOPY32) -O binary $(STOS_LOADER_MBR_ELF) $@
 	ndisasm -o 0x400 $@ > $@.disasm
 	xxd $@ > $@.hexdump
 
 $(STOS_LOADER_GPT_RAW): $(STOS_LOADER_GPT_OBJS)
 	$(LINK32) -T src/link/bootmgr.ld $^ -o $(STOS_LOADER_GPT_ELF)
+	#$(LINK32) -T src/link/boot_sector_dummy.ld $(STOS_LOADER_ENTRY_GPT_OBJ) -o $(STOS_LOADER_GPT_ELF).bootsector
 	$(OBJCOPY32) -O binary $(STOS_LOADER_GPT_ELF) $@
 	ndisasm -o 0x400 $@ > $@.disasm
 	xxd $@ > $@.hexdump
@@ -385,12 +394,12 @@ define action_burn
 	([ $(1) = gpt ] && ($(GPT_CHECKER) $(SYSTEM_DISK1_FILE) || make _system_create_gpt)) || true
 	([ $(1) = mbr ] && ($(MBR_CHECKER) $(SYSTEM_DISK1_FILE) || make _system_create_mbr)) || true
 
-	$(BURNER) mbr $(2)
-	$(BURNER) vbr $(VBR_RAW)
+	$(BURNER) mbr $(SYSTEM_DISK1_FILE) $(2)
+	$(BURNER) vbr $(SYSTEM_DISK1_FILE) $(VBR_RAW)
 endef
 
 system_burn_mbr: $(STOS_LOADER_MBR_RAW) $(VBR_RAW) auxillary
 	$(call action_burn,mbr,$<)
 
 system_burn_gpt: $(STOS_LOADER_GPT_RAW) $(VBR_RAW) auxillary
-	$(call action_burn,mbr,$<)
+	$(call action_burn,gpt,$<)

@@ -23,6 +23,7 @@
 #define _AUX_H_
 
 #include <stddef.h>
+#include <stdint.h>
 #include "defs.h"
 
 
@@ -35,6 +36,10 @@ void* memcpy(void* dest, const void* src, size_t count);
 
 int strncmp(const char* s1, const char* s2, size_t max);
 int memcmp (const void* p1, const void* p2, size_t size);
+
+size_t strlen(const char*);
+
+void divmod64_32(uint64_t x, uint32_t d, uint32_t* q, uint32_t* r);
 
 [[noreturn]]
 void halt();

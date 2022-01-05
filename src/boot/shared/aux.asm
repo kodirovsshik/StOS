@@ -23,6 +23,8 @@ global memcpy
 global memset
 global memcmp
 global strncmp
+global strlen
+global divmod64_32
 
 
 BITS 32
@@ -53,23 +55,29 @@ memset32:
 
 	cld
 
+	mov edi, dword [esp + 8]
+
 	mov ecx, dword [esp + 16]
 	mov edx, ecx
 	shr ecx, 2
 	jz .ret
 
-	mov edi, dword [esp + 8]
 	mov eax, dword [esp + 12]
 	rep stosd
 
+.smol:
 	mov ecx, edx
 	and ecx, 3
 	jz .ret
-	rep stosb
+.smol_loop:
+	stosb
+	shr eax, 8
+	dec ecx
+	jnz .smol_loop
 
 .ret:
 	pop edi
-	mov eax, dword [esp + 4]
+	mov eax, dword [esp + 8]
 	retd
 
 
@@ -84,16 +92,17 @@ memcpy:
 
 	cld
 
+	mov esi, dword [esp + 16]
+	mov edi, dword [esp + 12]
+
 	mov ecx, dword [esp + 20]
 	mov edx, ecx
 	shr ecx, 2
-	jz .ret
+	jz .smol
 
-	mov esi, dword [esp + 16]
-	mov edi, dword [esp + 12]
-	mov eax, edi ;//we return dst
 	rep movsd
 
+.smol:
 	mov ecx, edx
 	and ecx, 3
 	jz .ret
@@ -132,4 +141,35 @@ strncmp:
 .ret:
 	pop edi
 	pop esi
+	retd
+
+
+
+;//cdecl
+;//dword ptr string
+strlen:
+	mov eax, [esp + 4]
+
+.loop:
+	cmp byte [eax], 0
+	je .end
+	inc eax
+	jmp .loop
+
+.end:
+	sub eax, [esp + 4]
+	retd
+
+
+
+;//void divmod64_32(uint64_t x, uint32_t d, uint32_t* q, uint32_t* r);
+divmod64_32:
+	mov eax, [esp + 4]
+	mov edx, [esp + 8]
+	mov ecx, [esp + 12]
+	div ecx
+	mov ecx, [esp + 16]
+	mov [ecx], eax
+	mov ecx, [esp + 20]
+	mov [ecx], edx
 	retd

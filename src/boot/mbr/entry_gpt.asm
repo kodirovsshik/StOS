@@ -19,6 +19,10 @@
 
 
 
+%define GPT_LOAD_ADDR 0x600
+
+
+
 extern bootloader_main_wrapper
 extern __bootloader_size_sectors
 extern __bootloader_end
@@ -27,7 +31,7 @@ extern heap_top
 
 
 
-SECTION .boot_sector_text
+SECTION .boot
 BITS 16
 
 
@@ -40,6 +44,7 @@ times 11 - ($ - $$) db 0
 times 79 db 0x00
 
 .code:
+	xor ax, ax
 
 	mov ss, ax
 	mov sp, 0x7C00
@@ -47,7 +52,6 @@ times 79 db 0x00
 	sti
 	cld
 
-	xor ax, ax
 	mov ds, ax
 	mov bx, es
 	mov word [0x506], bx
@@ -81,17 +85,21 @@ times 79 db 0x00
 	jz cpu_err
 	;//Got at least 80386
 
-	mov ebp, 0xFE00
-	push word 2
-	push bp
-	push word 1
+	mov ebp, GPT_LOAD_ADDR
+	push dword 0
+	push dword 1
+	push ebp
+	push dword 0x00010010
 	call read_lba
+	add sp, 16
 
 %if 1
-	cmp dword [bx], 'EFI '
+	cmp dword [bp], 'EFI '
 	jne gpt_err
+	;cmp dword [bp + 4], 'PART'
+	;jne gpt_err
 %else
-	mov si, 0xFE00
+	mov si, GPT_LOAD_ADDR
 	mov di, data.efi_signature
 	mov cx, 6
 	repe cmpsw
@@ -99,32 +107,43 @@ times 79 db 0x00
 
 	mov ebx, [bp + 80] ;//GPT table entries count
 	xor edi, edi ;//Partition counter
-	mov edx, 2 ;//LBA counter
+	;mov edx, 1 ;//LBA counter
 
 	xor eax, eax
 	push eax
-	sub sp, 8
+	inc ax
+	push eax
+	sub sp, 4
 	push dword 0x00010010
+
 
 	mov ebp, eax
 ;//outer loop: loops through LBAs
 .gpt_loop1:
-	mov bp, 0xFE00
+	mov bp, GPT_LOAD_ADDR
 
 	lea edi, [esp + 4]
 	mov ax, bp
 	stosd
-	mov eax, edx
-	stosd
+	inc dword [di]
+	;mov eax, edx
+	;stosd
+
+	call read_lba
 
 	mov ax, 4
 
 ;//inner loop: loops through GPT entries inside an LBA
 .gpt_loop2:
+	pusha
+
 	mov si, bp
-	mov di, data.stos_bootloader
+	mov di, data.stos_bootloader - mbr + 0x7C00
 	mov cx, 8
 	repe cmpsw
+
+	popa
+
 	je .gpt_found
 
 	inc edi
@@ -142,7 +161,8 @@ times 79 db 0x00
 	push dword [bp + 36]
 	push dword [bp + 32]
 	push dword 0x600
-	push dword 16 + (__bootloader_size_sectors - 1) * 0x10000
+	push word __bootloader_size_sectors - 1
+	push word 16
 	call read_lba
 
 	jmp 0x0000:bootloader_main_wrapper
@@ -156,15 +176,18 @@ times 79 db 0x00
 ;//word count
 ;//word 16
 read_lba:
-	mov [.backup], si
+	;//mov [.backup], si
 	mov si, sp
 	times 2 inc si
 
 	mov ah, 0x42
+	clc
+	push bp
 	int 0x13
+	pop bp
 	jc read_err
 
-	mov si, [.backup]
+	;//mov si, [.backup]
 	ret
 .backup:
 dw 0

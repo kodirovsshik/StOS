@@ -38,14 +38,10 @@ SECTIONS
 	. = 0x400;
 	PROVIDE(__bootloader_start = .);
 
-	.text0 :
-	{
-		*(.boot_sector_text)
-	}
-	
 	.text :
 	{
-		*(.text)
+		*(.boot)
+		*(.text*)
 	}
 
 	. = ALIGN(., 16);

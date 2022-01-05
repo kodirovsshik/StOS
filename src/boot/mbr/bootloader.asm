@@ -202,14 +202,22 @@ preinit_error:
 
 bootloader_main_wrapper:
 
+	xor ax, ax
+	mov ss, ax
+	mov sp, 0x7C00
 	call INTEL_CPUID_ALGORITHM
 	jc err_cpu
 
-	push dword 0x200 ;//Interrupt enable
-	popfd
 
 %if 0
-	//Available memory for heap between code and stack
+	//Memory map:
+	//0x00600 - 0x0????: bootloader code
+	//0x0???? - 0x0????: (possible heap space)
+	//0x0???? - 0x07C00: stack
+	//0x07C00 - 0x0????: VBR code
+	//0x10000 - 0x?????: (possible heap space)
+
+	//Available memory for heap between code and stack bottom
 	A = 0x7C00 - __bootloader_end - STACK_SIZE
 	//Available memory for heap after mbr and vbr code/stack
 	B = mem size - 0x10000
@@ -229,7 +237,7 @@ bootloader_main_wrapper:
 	mov ebx, 639
 	cmovae eax, ebx
 	shl eax, 10
-	;//eax = memsize
+	;//eax is now memsize
 
 	mov ebx, 0x7C00 - STACK_SIZE
 	sub ebx, __bootloader_end
@@ -248,8 +256,6 @@ bootloader_main_wrapper:
 
 	mov dword [heap_top], ebx
 	mov dword [heap_limit], ecx
-
-	;//mov dword [32], timer_handler
 
 	mov dx, word [0x502]
 	mov byte [current_boot_disk], dl
@@ -335,7 +341,10 @@ halt:
 ;//dword ptr header ptr
 ;//cdecl
 _invoke_vbr_helper:
-	pushad
+	push ebx
+	push esi
+	push edi
+	push ebp
 	mov ebp, esp
 	sub esp, 6*4
 
@@ -378,9 +387,9 @@ BITS 16
 .fix_cs:
 	sti
 
-	mov si, word [ebp + 32 + 4 + 4*2] ;//arg[2]
-	mov dl, byte [ebp + 32 + 4 + 4*1] ;//arg[1]
-	mov cx, word [ebp + 32 + 4 + 4*0] ;//arg[0]
+	mov si, word [bp + 16 + 4 + 4*2] ;//arg[2]
+	mov dl, byte [bp + 16 + 4 + 4*1] ;//arg[1]
+	mov cx, word [bp + 16 + 4 + 4*0] ;//arg[0]
 	mov bx, .msg
 	mov dh, byte [0x503]
 	mov ax, word [0x506]
@@ -396,9 +405,11 @@ BITS 16
 
 	cli
 
-	mov eax, cr0
-	or al, 1
-	mov cr0, eax
+	mov ebx, cr0
+	or bl, 1
+	mov cr0, ebx
+
+	mov ebx, eax
 
 	lgdt [gdt_descriptor]
 
@@ -422,8 +433,13 @@ BITS 32
 	lodsd
 	mov gs, eax
 
+	mov eax, ebx
+
 	mov esp, ebp
-	popad
+	pop ebp
+	pop edi
+	pop esi
+	pop ebx
 	retd
 
 .msg:
@@ -468,10 +484,6 @@ BITS 32
 ;//cdecl
 ;//dword ds:si ptr
 _mbr_transfer_control_flow:
-	xor edx, edx
-	xor ebp, ebp
-	xor esi, esi
-	xor edi, edi
 	mov esi, [esp + 4]
 	mov dl, byte [esi]
 	mov edi, .scratch_area
@@ -484,14 +496,15 @@ _mbr_transfer_control_flow:
 	;//We save disk number to MBR partinion table entry's active field
 	;//because some old VBRs expect to find disk index there
 	;//and modern ones usually does not complain about extra bits being set
-.active_replace_loop:
-	mov eax, 0x7C00 - 2 - 64
+
+	mov ebx, 0x7E00 - 2 - 64
 	mov ecx, 4
-	mov bl, byte [eax]
-	test bl, bl
-	cmovs ebx, edx
-	mov byte [eax], dl
-	add eax, 16
+.active_replace_loop:
+	mov al, byte [ebx]
+	test al, al
+	cmovs eax, edx
+	mov byte [ebx], al
+	add ebx, 16
 	loop .active_replace_loop
 .skip_active_replace:
 
@@ -514,90 +527,28 @@ BITS 16
 	mov es, ax
 	mov fs, ax
 	mov gs, ax
+	jmp 0x0000:.fix_cs
 .fix_cs:
 	mov si, .scratch_area
 	mov bp, si
-	;//mov dl, disk_number //already done
 	mov di, [0x506]
 	mov es, di
 	mov di, [0x504]
+	mov dh, [0x503]
 	mov sp, 0x7C00
 	sti
+
 	xor eax, eax
 	xor ebx, ebx
 	xor ecx, ecx
-	jmp 0x0000:0x7C00
+	and edx, 0xFFFF
+	and esi, 0xFFFF
+	and edi, 0xFFFF
+	and ebp, 0xFFFF
+
+	jmp 0x7C00
 
 .scratch_area:
 times 16 db 0
 
 BITS 32
-
-
-
-
-
-%if 0
-timer_handler:
-	push ax
-
-	mov byte [sleep_finished], 1
-
-	mov al, EOI
-	out 0x20, al
-
-	pop ax
-	iret
-
-
-
-;//cdecl
-;//dword uint16_t count
-_sleep_ticks:
-	pushfd
-	cli
-
-	mov byte [sleep_finished], 0
-
-	mov al, 0b00110000
-	out 0x43, al
-	jmp $+2
-
-	mov ax, word [esp + 8]
-	out 0x40, al
-	jmp $+2
-
-	mov al, ah
-	out 0x40, al
-	jmp $+2
-
-	sti
-.wait:
-	cmp byte [sleep_finished], 0
-	jne .ret
-	hlt ;//We will resume after INT 8
-	jmp .wait
-
-.ret:
-	popfd
-	retd
-
-
-
-;//cdecl
-;//dword ns
-_sleep_ns_unchecked:
-	mov eax, dword [esp + 4]
-	xor edx, edx
-	mov ecx, 1193181
-	mul ecx
-	mov ecx, 1000000000
-	div ecx
-	inc eax
-	sub edx, 500000000
-	sbb eax, 0
-	push eax
-	call dword _sleep_ticks
-	add esp, 4
-	retd
-%endif

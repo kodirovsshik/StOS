@@ -40,12 +40,11 @@ SECTIONS
 	
 	PROVIDE(__vbr_start = .);
 
-	.text0 :
+	.text :
 	{
-		*(.boot_sector_text)
+		*(.boot)
+		*(.text*)
 	}
-	
-	.text : { *(.text) }
 
 	. = ALIGN(., 16);
 	.data : { *(.data) }

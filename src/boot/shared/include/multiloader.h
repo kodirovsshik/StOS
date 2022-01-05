@@ -62,6 +62,7 @@ inline const char* get_vbr_invoke_error_desc(int error);
 #define STOS_REQ_INVOKE_ERR_READ_ERR 0x80000002
 #define STOS_REQ_INVOKE_ERR_BAD_CPU 0x80000003
 #define STOS_REQ_INVOKE_ERR_INVALID_REQUEST 0x80000004
+#define STOS_REQ_INVOKE_DENIAL 0xFFFFFFFF
 
 
 
@@ -102,24 +103,12 @@ struct stos_boot_list_t
 };
 
 
-/*
+
 //STOS_REQ_BOOT
-enum class boot_error_t : uint8_t
-{
-	read_error = 1,
-	no_stos,
-	no_disk,
-	no_partition,
-	out_of_memory,
-	cpuid_error
-};
-*/
 typedef struct
 {
 	uint32_t partition;
 	uint8_t disk;
-	bool is_gpt : 1;
-	bool has_signature : 1;
 } stos_boot_req_data_t;
 
 
@@ -132,11 +121,17 @@ typedef struct
 
 inline const char* get_vbr_invoke_error_desc(uint32_t n)
 {
+	if (n == STOS_REQ_INVOKE_DENIAL)
+		return "Denial of service";
+
 	static const char* const arr[] =
 	{
 		"No error",
 		"Invalid request ID",
-		"(unknown error)"
+		"Read error",
+		"Unsuitable CPU detected: 64 bit CPU with cmov is required",
+		"Invalid request data",
+		"(unknown error)",
 	};
 
 	static const size_t N = sizeof(arr) / sizeof(arr[0]);

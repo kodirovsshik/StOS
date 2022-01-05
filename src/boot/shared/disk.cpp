@@ -335,7 +335,7 @@ uint32_t partition_iterator_t::get_mbr_entry(mbr_entry_t* info) const
 	}
 
 	memcpy(info, result, sizeof(mbr_entry_t));
-	return result->type ? 0 : ERR_NO_PARTITION;
+	return 0;
 }
 uint32_t partition_iterator_t::get_gpt_info(gpt_partition_info_t* info) const
 {

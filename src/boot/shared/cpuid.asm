@@ -34,11 +34,10 @@ SECTION .text
 
 ;//Sets carry if outdated CPU (no PM or CMOV) is detected
 INTEL_CPUID_ALGORITHM:
-	mov bp, sp
+	cli
+	clc
 	push word 0
 	pushf
-
-	cli
 
 	;//Check for 8086/80186
 	push sp
@@ -83,10 +82,6 @@ INTEL_CPUID_ALGORITHM:
 	jz .err
 	;//Got CPUID
 
-
-	;//Restore original value for EFLAGS
-	popf
-
 	xor eax, eax
 	cpuid
 	test eax, eax
@@ -99,12 +94,10 @@ INTEL_CPUID_ALGORITHM:
 	jz .err
 	;//Got CMOV
 
-	clc
-	jmp .ret
+	popfd
+	ret
 .err:
-	stc
-.ret:
-	lea sp, [bp - 4]
 	popf
 	add sp, 2
+	stc
 	ret
