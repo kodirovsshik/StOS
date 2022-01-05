@@ -30,6 +30,7 @@
 #include <stdarg.h>
 #include <locale.h>
 #include <uchar.h>
+#include <inttypes.h>
 
 #include <chrono>
 #include <utility>
@@ -249,7 +250,7 @@ int command_table(int argc, const char* const* argv)
 	check(argc == 1, ERR_ARGS_COUNT, usage_table, argv0);
 
 	uint32_t n;
-	check(sscanf(argv[0], "%u", &n) == 1 && n >= 128, ERR_ARGS, "Invalid partitions count: %s", argv[0]);
+	check(sscanf(argv[0], "%" PRIu32, &n) == 1 && n >= 128, ERR_ARGS, "Invalid partitions count: %s", argv[0]);
 
 	create_protective_mbr();
 
@@ -295,9 +296,9 @@ int command_create(int argc, const char* const* argv)
 
 	uint64_t first_lba, last_lba, table_lba;
 	uint32_t partition_number;
-	check(sscanf(argv[0], "%u", &partition_number) == 1, ERR_ARGS, "Invalid partition number: %s", argv[0]);
-	check(sscanf(argv[1], "%llu", &first_lba) == 1, ERR_ARGS, "Invalid LBA: %s", argv[1]);
-	check(sscanf(argv[2], "%llu", &last_lba) == 1, ERR_ARGS, "Invalid LBA: %s", argv[2]);
+	check(sscanf(argv[0], "%" PRIu32, &partition_number) == 1, ERR_ARGS, "Invalid partition number: %s", argv[0]);
+	check(sscanf(argv[1], "%" PRIu64, &first_lba) == 1, ERR_ARGS, "Invalid LBA: %s", argv[1]);
+	check(sscanf(argv[2], "%" PRIu64, &last_lba) == 1, ERR_ARGS, "Invalid LBA: %s", argv[2]);
 
 	table_lba = get_partition_table_offset(partition_number);
 
@@ -374,14 +375,14 @@ int subcommand_set_guid_le(const char* value, gpt_entry_t& entry)
 int subcommand_set_first(const char* str, gpt_entry_t& entry)
 {
 	uint64_t value;
-	check(sscanf(str, "%llu", &value) == 1, ERR_ARGS, "Invalid LBA: %s", str);
+	check(sscanf(str, "%" PRIu64, &value) == 1, ERR_ARGS, "Invalid LBA: %s", str);
 	entry.first_lba = value;
 	return 0;
 }
 int subcommand_set_last(const char* str, gpt_entry_t& entry)
 {
 	uint64_t value;
-	check(sscanf(str, "%llu", &value) == 1, ERR_ARGS, "Invalid LBA: %s", str);
+	check(sscanf(str, "%" PRIu64, &value) == 1, ERR_ARGS, "Invalid LBA: %s", str);
 	entry.last_lba = value;
 	return 0;
 }
@@ -403,7 +404,7 @@ int subcommand_set_name(const char* str, gpt_entry_t& entry)
 		if (result == (size_t)-3)
 			result = 0;
 
-		check(result >= 0, ERR_ARGS, "Unicode conversion failed");
+		check(result < (size_t)-3, ERR_ARGS, "Unicode conversion failed");
 
 		str += result;
 		len -= result;
@@ -415,6 +416,12 @@ int subcommand_set_name(const char* str, gpt_entry_t& entry)
 
 int command_set(int argc, const char* const* argv)
 {
+	if (argc != 3)
+	{
+		fprintf(stderr, usage_create, argv0);
+		return ERR_ARGS_COUNT;
+	}
+
 	const std::pair<const char*, int(*)(const char*, gpt_entry_t&)> handlers[] =
 	{
 		{ "type_str", subcommand_set_type_str },
@@ -427,20 +434,20 @@ int command_set(int argc, const char* const* argv)
 	};
 
 	uint32_t partition_number;
-	check(sscanf(argv[0], "%u", &partition_number) == 1, ERR_ARGS, "Invalid partition number: %s", argv[0]);
+	check(sscanf(argv[0], "%" PRIu32, &partition_number) == 1, ERR_ARGS, "Invalid partition number: %s", argv[0]);
 	uint64_t table_offset = get_partition_table_offset(partition_number);
 
 	gpt_entry_t table[4];
 	fseek(disk_f, (long)table_offset, SEEK_SET);
 	check(fread(&table, 1, 512, disk_f) == 512, ERR_READ, "Read error on %s", argv1);
 
-	int result = ERR_ARGS;
-
 	for (const auto& [cmd, handler] : handlers)
 	{
 		if (strcmp(cmd, argv[1]) == 0)
 		{
-			result = handler(argv[2], table[partition_number % 4]);
+			auto result = handler(argv[2], table[partition_number % 4]);
+			if (result != 0)
+				return result;
 			break;
 		}
 	}

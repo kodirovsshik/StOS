@@ -29,9 +29,9 @@ int main(int argc, char** argv)
 	fseek(fd, 0, SEEK_END);
 	const size_t fsize = ftell(fd);
 
-	const size_t total_sectors = fsize / 512;
-	const size_t first_valid_sector = 1;
-	const size_t last_valid_sector = total_sectors - 1;
+	const long long total_sectors = fsize / 512;
+	const long long first_valid_sector = 1;
+	const long long last_valid_sector = total_sectors - 1;
 
 	int num;
 	if (sscanf(argv[2], "%i", &num) != 1 || num < 1 || num > 4)
@@ -46,7 +46,7 @@ int main(int argc, char** argv)
 		return ERR_ARG_EXTRACT_BEGIN;
 
 	long long pcount, pend;
-	if (sscanf(argv[5], "%lli", &pcount) != 1 || pend < -1)
+	if (sscanf(argv[5], "%lli", &pcount) != 1 || pcount < -1)
 		return ERR_ARG_EXTRACT_END;
 
 	int active;
