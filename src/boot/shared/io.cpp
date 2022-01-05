@@ -152,11 +152,11 @@ void cls()
 
 
 
-uint8_t current_boot_drive = 0xFF;
+uint8_t current_boot_disk = 0xFF;
 
-uint8_t get_boot_drive()
+uint8_t get_boot_disk()
 {
-	return current_boot_drive;
+	return current_boot_disk;
 }
 uint8_t get_floppies_count()
 {
@@ -176,7 +176,7 @@ uint8_t get_floppies_count()
 
 
 
-uint8_t _drive_lba_helper(void*, uint8_t);
+uint8_t _disk_lba_helper(void*, uint8_t);
 
 typedef struct
 {
@@ -191,7 +191,7 @@ typedef struct
 #define LBA_COMMAND_READ 0x42
 #define LBA_COMMAND_WRITE 0x43
 
-uint8_t drive_lba_command(uint8_t disk, uint64_t lba, void* ptr, uint16_t num, uint8_t command)
+uint8_t disk_lba_command(uint8_t disk, uint64_t lba, void* ptr, uint16_t num, uint8_t command)
 {
 	lba_packet16_t packet;
 	packet.first = lba;
@@ -206,7 +206,7 @@ uint8_t drive_lba_command(uint8_t disk, uint64_t lba, void* ptr, uint16_t num, u
 		packet.dst_segment = p >> 4;
 		packet.n = current;
 
-		uint8_t status = _drive_lba_helper(&packet, disk);
+		uint8_t status = _disk_lba_helper(&packet, disk);
 		//memory_dump(&packet, sizeof(packet)); endl();
 		if (status)
 			return status;
@@ -219,13 +219,13 @@ uint8_t drive_lba_command(uint8_t disk, uint64_t lba, void* ptr, uint16_t num, u
 	return 0;
 }
 
-uint8_t write_drive_lba(uint8_t disk, uint64_t lba, const void* ptr, uint16_t num)
+uint8_t write_disk_lba(uint8_t disk, uint64_t lba, const void* ptr, uint16_t num)
 {
-	return drive_lba_command(disk, lba, (void*)ptr, num, LBA_COMMAND_WRITE);
+	return disk_lba_command(disk, lba, (void*)ptr, num, LBA_COMMAND_WRITE);
 }
-uint8_t read_drive_lba(uint8_t disk, uint64_t lba, void* ptr, uint16_t num)
+uint8_t read_disk_lba(uint8_t disk, uint64_t lba, void* ptr, uint16_t num)
 {
-	return drive_lba_command(disk, lba, ptr, num, LBA_COMMAND_READ);
+	return disk_lba_command(disk, lba, ptr, num, LBA_COMMAND_READ);
 }
 
 void tabulate(int n)

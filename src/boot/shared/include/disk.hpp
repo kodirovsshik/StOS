@@ -32,7 +32,7 @@
 
 
 #define DISK_END -1
-#define DISK_BEGIN (get_floppies_count() != 0 ? 0 : (get_drives_count() != 0 ? 0x80 : DISK_END))
+#define DISK_BEGIN (get_floppies_count() != 0 ? 0 : (get_disks_count() != 0 ? 0x80 : DISK_END))
 #define ERR_NO_LBA 1
 #define ERR_NO_MBR 2
 #define ERR_NO_PARTITION 3
@@ -48,14 +48,14 @@
 
 _EXTERN_C_
 
-uint8_t get_drives_count();
+uint8_t get_disks_count();
 uint8_t get_floppies_count();
-uint8_t get_boot_drive();
+uint8_t get_boot_disk();
 
-uint8_t read_drive_lba(uint8_t disk, uint64_t lba, void* ptr, uint16_t sectors);
-uint8_t write_drive_lba(uint8_t disk, uint64_t lba, const void* ptr, uint16_t sectors);
+uint8_t read_disk_lba(uint8_t disk, uint64_t lba, void* ptr, uint16_t sectors);
+uint8_t write_disk_lba(uint8_t disk, uint64_t lba, const void* ptr, uint16_t sectors);
 
-bool drive_lba_supported(uint8_t disk);
+bool disk_lba_supported(uint8_t disk);
 
 _EXTERN_C_END_
 

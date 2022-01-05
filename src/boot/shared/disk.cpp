@@ -40,7 +40,7 @@ static bool is_extended_type(uint8_t type)
 }
 
 
-#define read_guard(...) { uint8_t status = read_drive_lba(__VA_ARGS__); if (status) { this->read_status = status; return ERR_READ; } }
+#define read_guard(...) { uint8_t status = read_disk_lba(__VA_ARGS__); if (status) { this->read_status = status; return ERR_READ; } }
 #define err_guard(expr) { auto status = expr; if (status) return status; }
 
 uint8_t disk_t::_init(uint8_t disk)
@@ -52,7 +52,7 @@ uint8_t disk_t::_init(uint8_t disk)
 	{
 		mbr_bootloader_t t;
 
-		if (!drive_lba_supported(disk))
+		if (!disk_lba_supported(disk))
 			return ERR_NO_LBA;
 
 		read_guard(disk, 0, &t, 1);
@@ -80,7 +80,7 @@ uint8_t disk_t::_init(uint8_t disk)
 					return ERR_CORRUPTED_PARTITION_TABLE;
 
 				gpt_header_t hdr;
-				if ((x = read_drive_lba(disk, 1, &hdr, 1)) != 0)
+				if ((x = read_disk_lba(disk, 1, &hdr, 1)) != 0)
 				{
 					this->read_status = x;
 					continue;
@@ -172,7 +172,7 @@ uint8_t disk_t::_init(uint8_t disk)
 		{
 			{
 				vbr_t vbr;
-				if ((x = read_drive_lba(disk, stos_mbr_size, &vbr, 1)) != 0)
+				if ((x = read_disk_lba(disk, stos_mbr_size, &vbr, 1)) != 0)
 				{
 					this->read_status = x;
 					break;
@@ -222,7 +222,7 @@ uint8_t disk_t::init(uint8_t disk)
 
 
 #undef read_guard
-#define read_guard(...) { uint8_t status = read_drive_lba(__VA_ARGS__); if (status) { this->disk->read_status = status; return ERR_READ; } }
+#define read_guard(...) { uint8_t status = read_disk_lba(__VA_ARGS__); if (status) { this->disk->read_status = status; return ERR_READ; } }
 
 partition_iterator_t disk_t::begin()
 {

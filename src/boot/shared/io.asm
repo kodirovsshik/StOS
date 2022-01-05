@@ -26,9 +26,9 @@
 global puts
 global putc
 global endl
-global _drive_lba_helper
-global drive_lba_supported
-global get_drives_count
+global _disk_lba_helper
+global disk_lba_supported
+global get_disks_count
 global getch
 global kbhit
 global select_video_page
@@ -108,7 +108,7 @@ kbhit:
 
 
 
-get_drives_count:
+get_disks_count:
 	mov al, byte [0x475]
 	retd
 
@@ -116,7 +116,7 @@ get_drives_count:
 
 ;//dword uint8_t
 ;//dword void*
-_drive_lba_helper:
+_disk_lba_helper:
 	push esi
 	mov dl, byte [esp + 12]
 	mov si, word [esp + 8]
@@ -130,7 +130,7 @@ _drive_lba_helper:
 
 
 ;//dword uint8_t index
-drive_lba_supported:
+disk_lba_supported:
 	push ebx
 
 	mov ah, 0x41

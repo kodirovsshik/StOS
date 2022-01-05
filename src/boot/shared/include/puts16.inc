@@ -21,6 +21,20 @@
 
 ;//DS:SI = C string ptr
 puts16:
+
+%ifdef PUTC16_SMOL
+
+	mov ah, 0x0E
+	mov bx, 0x0007
+.loop:
+	lodsb
+	int 0x10
+	test al, al
+	jnz .loop
+	ret
+
+%else
+
 	push ax
 	push bx
 	mov ah, 0x0E
@@ -48,3 +62,5 @@ puts16:
 	ret
 .msg_null:
 db "(null)", 0
+
+%endif

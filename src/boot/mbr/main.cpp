@@ -57,13 +57,13 @@ bool is_non_fatal_floppy(uint8_t disk, uint8_t status);
 void main()
 {
 	puts("StOS loader v1.0\n");
-	const int nh = get_drives_count();
+	const int nh = get_disks_count();
 	const int nf = get_floppies_count();
 	bool with_errors = false;
 
 	puts("Detected ");
 	put32u(nh);
-	puts(" hard drive disk");
+	puts(" hard disk disk");
 	if (nh != 1)
 		putc('s');
 	endl();
@@ -149,7 +149,7 @@ void main()
 			puts(" Partition ");
 			put32u(partition);
 		}
-		else if (disk == get_boot_drive())
+		else if (disk == get_boot_disk())
 			puts(" (current)");
 	};
 
@@ -184,7 +184,7 @@ void main()
 		disk_t disk;
 		disk.init(i);
 
-		if (disk.init_status == 0 && disk.has_mbr && disk.bios_number != get_boot_drive())
+		if (disk.init_status == 0 && disk.has_mbr && disk.bios_number != get_boot_disk())
 			add_boot_option(i, 0, true);
 		else if (disk.init_status == 0)
 		{
@@ -315,7 +315,7 @@ uint32_t invoke_vbr(uint8_t disk_n, uint32_t partition, stos_request_header_t* h
 
 	{
 		mbr_bootloader_t mbr;
-		x = read_drive_lba(disk_n, 0, &mbr, 1);
+		x = read_disk_lba(disk_n, 0, &mbr, 1);
 		if (x) return ERR_READ;
 		if (read_status) *read_status = disk.read_status;
 		if (mbr.signature != 0xAA55 || strncmp(mbr.metadata.signature, "StOSboot", 8) != 0)
@@ -351,7 +351,7 @@ uint32_t invoke_vbr(uint8_t disk_n, uint32_t partition, stos_request_header_t* h
 			lba = mbr_size;
 	}
 
-	x = read_drive_lba(disk_n, lba, (void*)0x7C00, 2);
+	x = read_disk_lba(disk_n, lba, (void*)0x7C00, 2);
 	if (x && read_status) *read_status = x;
 	if (x)
 		return ERR_READ;
@@ -405,7 +405,7 @@ uint32_t _boot(uint32_t n, uint8_t vbr_disk, uint32_t vbr_partition, uint8_t* re
 
 	if (!entry.use_vbr)
 	{
-		x = read_drive_lba(entry.disk, aiml, (void*)0x7C00, 2);
+		x = read_disk_lba(entry.disk, aiml, (void*)0x7C00, 2);
 		if (x && read_status) *read_status = x;
 		if (x) return ERR_READ;
 
@@ -489,7 +489,7 @@ int next_disk(int x)
 
 	if (x >= 0x80 && x <= 0xFF)
 	{
-		if (x - 0x80 + 1 >= get_drives_count())
+		if (x - 0x80 + 1 >= get_disks_count())
 			return DISK_END;
 	}
 

@@ -69,7 +69,7 @@ override DBG := -g
 endif
 
 override _CC_ARGS := $(CC_ARGS) -std=c++20 -c -ffreestanding -mno-red-zone -Wall -Wextra -Werror $(DBG)
-override _CXX_ARGS := $(CXX_ARGS) $(_CC_ARGS) -fno-rtti -fno-exceptions -std=c++20
+override _CXX_ARGS := $(CXX_ARGS) $(_CC_ARGS) -fno-rtti -fno-exceptions
 
 override CC_INCLUDE_BOOT := -I$(LOCAL_PATH)/src/boot/shared/include
 
@@ -84,8 +84,9 @@ CXX16 := $(CXX32) -m16
 CC := gcc
 CXX := g++
 
-override _CC := $(CC)
-override _CXX := $(CXX) -std=c++20
+override _CC_HOST_ARGS := -Wall -Wextra -Werror -std=c++20
+override _CC := $(CC) $(_CC_HOST_ARGS)
+override _CXX := $(CXX) $(_CC_HOST_ARGS)
 
 override _CC32 := $(CC32) $(_CC_ARGS)
 override _CC64 := $(CC64) $(_CC_ARGS)
@@ -106,25 +107,35 @@ override GDB64 := $(GDB) $(_GDB_ARGS) $(GDB_ARGS) -x stuff/gdb/gdb_script64
 
 
 
-STOS_LOADER_MBR_OBJS :=
+STOS_LOADER_OBJS :=
 
-STOS_LOADER_MBR_OBJS += temp/boot/mbr/main.cpp.elf32
-STOS_LOADER_MBR_OBJS += temp/boot/mbr/bootloader.cpp.elf32
-STOS_LOADER_MBR_OBJS += temp/boot/mbr/memory.cpp.elf32
+STOS_LOADER_OBJS += temp/boot/mbr/main.cpp.elf32
+STOS_LOADER_OBJS += temp/boot/mbr/bootloader.cpp.elf32
+STOS_LOADER_OBJS += temp/boot/mbr/memory.cpp.elf32
 
-STOS_LOADER_MBR_OBJS += temp/boot/mbr/entry.asm.elf32
-STOS_LOADER_MBR_OBJS += temp/boot/mbr/bootloader.asm.elf32
+STOS_LOADER_OBJS += temp/boot/mbr/bootloader.asm.elf32
 
-STOS_LOADER_MBR_OBJS += temp/boot/shared/io.cpp.elf32
-STOS_LOADER_MBR_OBJS += temp/boot/shared/disk.cpp.elf32
+STOS_LOADER_OBJS += temp/boot/shared/io.cpp.elf32
+STOS_LOADER_OBJS += temp/boot/shared/disk.cpp.elf32
 
-STOS_LOADER_MBR_OBJS += temp/boot/shared/interrupt.asm.elf32
-STOS_LOADER_MBR_OBJS += temp/boot/shared/io.asm.elf32
-STOS_LOADER_MBR_OBJS += temp/boot/shared/aux.asm.elf32
-STOS_LOADER_MBR_OBJS += temp/boot/shared/cpuid.asm.elf32
+STOS_LOADER_OBJS += temp/boot/shared/interrupt.asm.elf32
+STOS_LOADER_OBJS += temp/boot/shared/io.asm.elf32
+STOS_LOADER_OBJS += temp/boot/shared/aux.asm.elf32
+STOS_LOADER_OBJS += temp/boot/shared/cpuid.asm.elf32
+
+
+STOS_LOADER_MBR_OBJS := $(STOS_LOADER_OBJS)
+STOS_LOADER_GPT_OBJS := $(STOS_LOADER_OBJS)
+
+STOS_LOADER_MBR_OBJS += temp/boot/mbr/entry_mbr.asm.elf32
+STOS_LOADER_GPT_OBJS += temp/boot/mbr/entry_gpt.asm.elf32
+
 
 STOS_LOADER_MBR_ELF := result/bootloader_mbr.elf
+STOS_LOADER_GPT_ELF := result/bootloader_gpt.elf
+
 STOS_LOADER_MBR_RAW := result/bootloader_mbr.img
+STOS_LOADER_GPT_RAW := result/bootloader_gpt.img
 
 
 
@@ -146,6 +157,7 @@ VBR_OBJS += temp/boot/shared/io.asm.elf32
 VBR_OBJS += temp/boot/shared/aux.asm.elf32
 VBR_OBJS += temp/boot/shared/interrupt.asm.elf32
 VBR_OBJS += temp/boot/shared/cpuid.asm.elf32
+
 
 VBR_ELF := result/vbr.elf
 VBR_RAW := result/vbr.img
@@ -178,7 +190,7 @@ CREATE_OUTPUT_DIR = X="$@" ; mkdir -p $${X%/*}
 
 
 
-all: stos_loader_mbr vbr
+all: stos_loader_mbr stos_loader_gpt vbr
 
 
 
@@ -194,7 +206,7 @@ todo:
 
 stos_loader_mbr: $(STOS_LOADER_MBR_RAW)
 
-
+stos_loader_gpt: $(STOS_LOADER_GPT_RAW)
 
 vbr: $(VBR_RAW)
 
@@ -218,6 +230,12 @@ host_boot:
 $(STOS_LOADER_MBR_RAW): $(STOS_LOADER_MBR_OBJS)
 	$(LINK32) -T src/link/bootmgr.ld $^ -o $(STOS_LOADER_MBR_ELF)
 	$(OBJCOPY32) -O binary $(STOS_LOADER_MBR_ELF) $@
+	ndisasm -o 0x400 $@ > $@.disasm
+	xxd $@ > $@.hexdump
+
+$(STOS_LOADER_GPT_RAW): $(STOS_LOADER_GPT_OBJS)
+	$(LINK32) -T src/link/bootmgr.ld $^ -o $(STOS_LOADER_GPT_ELF)
+	$(OBJCOPY32) -O binary $(STOS_LOADER_GPT_ELF) $@
 	ndisasm -o 0x400 $@ > $@.disasm
 	xxd $@ > $@.hexdump
 
@@ -258,13 +276,6 @@ temp/boot/%.asm.elf32: src/boot/%.asm $(INIT_BUILD_DIRS)
 
 temp/boot/%.asm.elf64: src/boot/%.asm $(INIT_BUILD_DIRS)
 	$(NASM) -f elf64 $< -o $@ -Isrc/boot/shared/include
-
-
-#temp/boot/%.c.elf32: src/boot/%.c $(INIT_BUILD_DIRS)
-#	$(_CC16) $< -o $@ $(CC_INCLUDE_BOOT)
-
-#temp/boot/%.cpp.elf32: src/boot/%.cpp $(INIT_BUILD_DIRS)
-#	$(_CXX16) $< -o $@ $(CC_INCLUDE_BOOT)
 
 temp/boot/shared/disk.cpp.elf32: src/boot/shared/disk.cpp $(INIT_BUILD_DIRS)
 	$(_CXX32) $< -o $@ $(CC_INCLUDE_BOOT) -include src/boot/shared/include/aux.h
@@ -336,16 +347,26 @@ system_create_dummy_disk_layout: auxillary
 
 
 
-system_create_mbr: $(PARTITIONER_MBR)
+system_create_mbr:
 	stat $(NOECHO) $(SYSTEM_DISK1_FILE) || make system_wipe
 	make _system_create_mbr
-
 
 _system_create_mbr: $(PARTITIONER_MBR)
 	$(PARTITIONER_MBR) $(SYSTEM_DISK1_FILE) 1 0 0 0 0
 	$(PARTITIONER_MBR) $(SYSTEM_DISK1_FILE) 2 0 0 0 0
 	$(PARTITIONER_MBR) $(SYSTEM_DISK1_FILE) 3 0 0 0 0
 	$(PARTITIONER_MBR) $(SYSTEM_DISK1_FILE) 4 0 0 0 0
+
+
+
+system_create_gpt:
+	stat $(NOECHO) $(SYSTEM_DISK1_FILE) || make system_wipe
+	make _system_create_gpt
+
+_system_create_gpt: $(PARTITIONER_GPT)
+	$(PARTITIONER_GPT) $(SYSTEM_DISK1_FILE) table 128
+	$(PARTITIONER_GPT) $(SYSTEM_DISK1_FILE) create 0 36 291
+	$(PARTITIONER_GPT) $(SYSTEM_DISK1_FILE) set 0 type_str "StOS bootloader "
 
 
 
@@ -358,8 +379,18 @@ $(BURNER): $(BURNER).cpp
 
 
 
-system_burn_mbr: $(STOS_LOADER_MBR_RAW) $(VBR_RAW) auxillary
+define action_burn
 	stat $(NOECHO) $(SYSTEM_DISK1_FILE) || make system_wipe
-	$(MBR_CHECKER) $(SYSTEM_DISK1_FILE) || make _system_create_mbr
-	stuff/burner/a mbr $(SYSTEM_DISK1_FILE) $<
-	stuff/burner/a vbr $(SYSTEM_DISK1_FILE) $(VBR_RAW)
+
+	([ $(1) = gpt ] && ($(GPT_CHECKER) $(SYSTEM_DISK1_FILE) || make _system_create_gpt)) || true
+	([ $(1) = mbr ] && ($(MBR_CHECKER) $(SYSTEM_DISK1_FILE) || make _system_create_mbr)) || true
+
+	$(BURNER) mbr $(2)
+	$(BURNER) vbr $(VBR_RAW)
+endef
+
+system_burn_mbr: $(STOS_LOADER_MBR_RAW) $(VBR_RAW) auxillary
+	$(call action_burn,mbr,$<)
+
+system_burn_gpt: $(STOS_LOADER_GPT_RAW) $(VBR_RAW) auxillary
+	$(call action_burn,mbr,$<)

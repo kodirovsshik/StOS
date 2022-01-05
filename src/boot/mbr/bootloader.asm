@@ -27,7 +27,7 @@ global _sleep_ns_unchecked
 global _invoke_vbr_helper
 
 extern main
-extern current_boot_drive
+extern current_boot_disk
 extern puts
 extern putc
 extern __bootloader_end
@@ -252,7 +252,7 @@ bootloader_main_wrapper:
 	;//mov dword [32], timer_handler
 
 	mov dx, word [0x502]
-	mov byte [current_boot_drive], dl
+	mov byte [current_boot_disk], dl
 
 .a20_check:
 	call check_a20
@@ -481,8 +481,8 @@ _mbr_transfer_control_flow:
 	test dl, dl
 	jns .skip_active_replace
 
-	;//We save drive number to MBR partinion table entry's active field
-	;//because some old VBRs expect to find drive index there
+	;//We save disk number to MBR partinion table entry's active field
+	;//because some old VBRs expect to find disk index there
 	;//and modern ones usually does not complain about extra bits being set
 .active_replace_loop:
 	mov eax, 0x7C00 - 2 - 64

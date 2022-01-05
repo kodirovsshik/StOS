@@ -53,8 +53,6 @@ times 79 db 0x00
 	mov word [0x502], dx
 	mov word [0x504], di
 
-	;//mov ss, ... disables interrupts for enough time for
-	;// us to do mov sp, ..., so no need to do cli/sti
 	mov ss, ax
 	mov sp, 0x7C00
 

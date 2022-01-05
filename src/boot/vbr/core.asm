@@ -241,7 +241,7 @@ BITS 16
 
 
 BITS 32
-get_boot_drive:
+get_boot_disk:
 	xor eax, eax
 	mov al, DL_BACKUP
 	retd
