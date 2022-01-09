@@ -19,40 +19,27 @@
 
 
 
-#ifndef _AUX_H_
-#define _AUX_H_
-
-#include <stddef.h>
-#include <stdint.h>
-#include "defs.h"
+#include "bootloader_string.h"
+#include "bootloader.h"
 
 
 
 _EXTERN_C_
 
-void* memset  (void* dst, int val, size_t count);
-void* memset32(void* dst, int val, size_t count);
-void* memcpy(void* dest, const void* src, size_t count);
+const uint32_t _STACK_TOP = (uint32_t)&__STACK_TOP;
 
-int strncmp(const char* s1, const char* s2, size_t max);
-int memcmp (const void* p1, const void* p2, size_t size);
+extern const char global_canary[];
+extern const char default_canary[];
+extern const char __canary_size[];
 
-size_t strlen(const char*);
-
-void divmod64_32(uint64_t x, uint32_t d, uint32_t* q, uint32_t* r);
-
-[[noreturn]]
-void halt();
+const size_t canary_size = (size_t)__canary_size;
 
 _EXTERN_C_END_
 
 
 
-template<class T, size_t N>
-consteval size_t countof(const T (&)[N])
+void check_canary()
 {
-	return N;
+	if (memcmp(global_canary, default_canary, canary_size) != 0)
+		panic("Stack smash detected");
 }
-
-
-#endif //!_AUX_H_

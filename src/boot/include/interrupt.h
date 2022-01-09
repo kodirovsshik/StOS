@@ -19,53 +19,40 @@
 
 
 
-#include "io.h"
-#include "disk.hpp"
-#include "aux.h"
+#ifndef _INTERRUPT_H_
+#define _INTERRUPT_H_
+
+
+#include <stdint.h>
+
+#include "defs.h"
+
+
+
+typedef struct
+{
+	uint32_t eax;
+	uint32_t ecx;
+	uint32_t edx;
+	uint32_t ebx;
+	uint32_t esi;
+	uint32_t edi;
+	uint32_t ebp;
+	uint32_t eflags;
+} registers_info_t;
+
+
+#define EFLAGS_CF (uint32_t(1) << 0)
+
 
 
 
 _EXTERN_C_
 
-
-[[noreturn]]
-void __err(const char* what, const char* file, uint32_t line)
-{
-	puts("\n\nCRITICAL ERROR:\n");
-	puts(what);
-	puts("\n\nAt \"");
-	puts(file);
-	puts("\":");
-	put32u(line);
-	puts("\nEXECUTION HALTED");
-	halt();
-}
-
-
-
-#if 0
-//void _sleep_ticks(uint16_t ticks);
-void _sleep_ns_unchecked(int ns);
-
-void nanosleep(int64_t ns)
-{
-	static constexpr int threshold = 54923771;
-
-	while (ns > 0)
-	{
-		uint64_t current = (ns > threshold) ? threshold : ns;
-
-		_sleep_ns_unchecked(current);
-		ns -= current;
-	}
-}
-
-void sleep(uint32_t ms)
-{
-	nanosleep((uint64_t)ms * 1000000);
-}
-#endif
-
-
+void interrupt(uint8_t vector, registers_info_t*);
 
 _EXTERN_C_END_
+
+
+
+#endif //!_INTERRUPT_H_

@@ -19,39 +19,12 @@
 
 
 
-#ifndef _IO_H_
-#define _IO_H_
-
-
-#include <stdint.h>
-
-#include "defs.h"
+#include "bootloader.h"
 
 
 
-_EXTERN_C_
-
-
-void select_video_page(uint8_t n);
-
-void cls();
-void puts(const char*);
-void putc(char);
-void endl();
-void put0x32x(uint32_t x);
-void put32x(uint32_t x);
-void put32u(uint32_t u);
-bool get32(uint32_t* dst, uint32_t max, uint32_t digits);
-bool get32u(uint32_t* dst, uint32_t max = 0xFFFFFFFF);
-void tabulate(int times);
-
-
-uint16_t getch();
-uint16_t kbhit();
-
-
-_EXTERN_C_END_
-
-
-
-#endif //!_IO_H_
+[[noreturn]]
+void main()
+{
+	panic("AAAAAA");
+}

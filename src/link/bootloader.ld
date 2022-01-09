@@ -22,13 +22,10 @@
 OUTPUT_FORMAT("elf32-i386")
 OUTPUT_ARCH(i386)
 
-ENTRY(main)
+ENTRY(mbr)
 
 SECTIONS
 {
-
-	PROVIDE(MBR_VERSION = 0x0100);
-
 	PROVIDE(SEG_CODE16 = gdt.code16 - gdt);
 	PROVIDE(SEG_CODE32 = gdt.code32 - gdt);
 	PROVIDE(SEG_DATA16 = gdt.data16 - gdt);
@@ -48,35 +45,41 @@ SECTIONS
 	.data : { *(.data) }
 
 	. = ALIGN(., 16);
-	.rodata : { *(.rodata) }
+	.bss : { *(.bss) }
 
 	. = ALIGN(., 16);
-	.bss : { *(.bss) }
+	.rodata : { *(.rodata) }
+
+
+
+	.init  : { KEEP (*(.init)) }
 
 	.init_array :
 	{
-		PROVIDE(__init_arr = .); 
-		KEEP(*(SORT_NONE(.init_array)))
-		PROVIDE(__init_arr_end = .);
+		PROVIDE(__init_array = .);
+		KEEP (*(SORT(.init_array.*) .init_array))
+		KEEP (*(SORT(.ctors.*) .ctors))
+		PROVIDE(__init_array_end = .);
 	}
-	.fini :
+
+	.canary :
 	{
-		PROVIDE(__fini_arr = .); 
-		KEEP(*(SORT_NONE(.fini)))
-		PROVIDE(__fini_arr_end = .);
+		__canary_begin = .;
+		KEEP (*(.canary))
+		__canary_end = .;
+		PROVIDE(__canary_size = __canary_end - __canary_begin);
 	}
 
 
-	. = ALIGN(4);
-	PROVIDE(__bootloader_end = .);
 
-	/*
-	PROVIDE(STACK_SIZE = 2048);
-	PROVIDE(STACK_TOP = ALIGN(__bootloader_end + STACK_SIZE, 4));
-	*/
+	. = ALIGN(8);
+	PROVIDE(__bootloader_end = .);
 	
 	PROVIDE(__bootloader_size = __bootloader_end - __bootloader_start);
 	PROVIDE(__bootloader_size_sectors = ALIGN(__bootloader_size, 512) / 512);
+	
+	PROVIDE(__STACK_SIZE = 6144);
+	PROVIDE(__STACK_TOP = ALIGN(__bootloader_end + __STACK_SIZE, 4));
 
 
 

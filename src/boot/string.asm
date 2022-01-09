@@ -19,26 +19,21 @@
 
 
 
-global memcpy
 global memset
+global memset32
 global memcmp
-global strncmp
-global strlen
-global divmod64_32
+global memcpy
 
 
-BITS 32
+
+
+
 SECTION .text
+BITS 32
 
 
-
-;//cdecl
-;//dword size
-;//dword byte value
-;//dword ptr
 memset:
 	xor eax, eax
-	mov edx, eax
 	mov al, [esp + 8]
 	mov ecx, 0x01010101
 	mul ecx
@@ -46,60 +41,89 @@ memset:
 
 
 
-;//cdecl
-;//dword size
-;//dword value
-;//dword ptr
 memset32:
-	push edi
 
+	push edi
 	cld
 
-	mov edi, dword [esp + 8]
+	mov eax, [esp + 12]
 
-	mov ecx, dword [esp + 16]
+	mov edi, [esp + 8]
+	mov ecx, [esp + 16]
 	mov edx, ecx
 	shr ecx, 2
-	jz .ret
-
-	mov eax, dword [esp + 12]
+	jz .smol
 	rep stosd
 
 .smol:
-	mov ecx, edx
-	and ecx, 3
+	and edx, 3
 	jz .ret
-.smol_loop:
 	stosb
+
+	dec edx
+	jz .ret
 	shr eax, 8
-	dec ecx
-	jnz .smol_loop
+	stosb
+
+	dec edx
+	jz .ret
+	shr eax, 8
+	stosb
 
 .ret:
 	pop edi
-	mov eax, dword [esp + 8]
+	mov eax, [esp + 4]
 	retd
 
 
 
-;//cdecl
-;//dword size
-;//dword src
-;//dword dst
+
+memcmp:
+	push esi
+	push edi
+
+	mov ecx, [esp + 20]
+	mov edi, [esp + 16]
+	mov esi, [esp + 12]
+	mov edx, ecx
+
+	cld
+
+	shr ecx, 2
+	jz .smol
+	repe cmpsd
+	jne .after_cmp
+
+.smol:
+	mov ecx, edx
+	and ecx, 3
+	jz .after_cmp
+	repe cmpsb
+
+.after_cmp:
+	mov ecx, 1
+	mov edx, -1
+	mov eax, 0
+	cmovb eax, ecx
+	cmova eax, edx
+
+	pop edi
+	pop esi
+	ret
+
+
+
 memcpy:
 	push esi
 	push edi
 
-	cld
-
-	mov esi, dword [esp + 16]
-	mov edi, dword [esp + 12]
-
-	mov ecx, dword [esp + 20]
+	mov edi, [esp + 12]
+	mov esi, [esp + 16]
+	mov ecx, [esp + 20]
 	mov edx, ecx
+
 	shr ecx, 2
 	jz .smol
-
 	rep movsd
 
 .smol:
@@ -109,67 +133,7 @@ memcpy:
 	rep movsb
 
 .ret:
-	pop esi
-	pop edi
-	retd
-
-
-
-;//cdecl
-;//dword size
-;//dword s2
-;//dword s1
-memcmp:
-strncmp:
-	push esi
-	push edi
-
-	cld
-	mov esi, dword [esp + 12]
-	mov edi, dword [esp + 16]
-	mov ecx, dword [esp + 20]
-	repe cmpsb
-
-	mov eax, 1
-	mov ecx, -1
-	je .zero
-	cmovb eax, ecx
-	jmp .ret
-
-.zero:
-	xor eax, eax
-.ret:
 	pop edi
 	pop esi
-	retd
-
-
-
-;//cdecl
-;//dword ptr string
-strlen:
 	mov eax, [esp + 4]
-
-.loop:
-	cmp byte [eax], 0
-	je .end
-	inc eax
-	jmp .loop
-
-.end:
-	sub eax, [esp + 4]
-	retd
-
-
-
-;//void divmod64_32(uint64_t x, uint32_t d, uint32_t* q, uint32_t* r);
-divmod64_32:
-	mov eax, [esp + 4]
-	mov edx, [esp + 8]
-	mov ecx, [esp + 12]
-	div ecx
-	mov ecx, [esp + 16]
-	mov [ecx], eax
-	mov ecx, [esp + 20]
-	mov [ecx], edx
-	retd
+	ret

@@ -1,4 +1,4 @@
-%if 0
+#if 0
 	  This file is a part of StOS project - a small operating system
 	  	made for learning purposes
 	  Copyright (C) 2021 Egorov Stanislav, kodirovsshik@mail.ru, kodirovsshik@gmail.com
@@ -15,18 +15,29 @@
 
 	  You should have received a copy of the GNU General Public License
 	  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-%endif
+#endif
 
 
-%define DS_SI_BACKUP_AREA 0x580
-%define ES_DI_BACKUP_AREA 0x590
-%define DX_BACKUP word [0x594]
-%define DL_BACKUP byte [0x594]
-%define DH_BACKUP byte [0x595]
-%define LBA_PACKET_AREA 0x596
-%define CX_BACKUP word [0x5A6]
-%define INVOKE_DATETIME_AREA 0x5A8
-%define IS_STOS_REQ byte [0x5A9]
+
+#include "defs.h"
+#include "bootloader.h"
 
 
-%define STACK_SIZE 2048
+
+void init_memory_allocation();
+
+
+
+_EXTERN_C_
+
+[[noreturn]]
+void postinit();
+
+[[noreturn]]
+void bootloader_init()
+{
+	init_memory_allocation();
+	postinit();
+}
+
+_EXTERN_C_END_

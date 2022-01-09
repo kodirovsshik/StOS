@@ -186,6 +186,9 @@ BITS 32
 
 	retd
 
-ALIGN 4
+
+
+
+SECTION .bss
 .save_area:
-dd 0
+resd 1

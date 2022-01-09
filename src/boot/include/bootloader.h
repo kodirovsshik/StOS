@@ -19,58 +19,21 @@
 
 
 
-#ifndef _BOOTLOADER_H_
-#define _BOOTLOADER_H_
+#include "defs.h"
 
 #include <stdint.h>
-#include <stddef.h>
 
-#include "aux.h"
-#include "mbr.h"
 
 
 _EXTERN_C_
 
-[[noreturn]]
-void halt();
-
-
-[[noreturn]]
-void __err(const char* what, const char* file, uint32_t line);
-#define _err(what) __err(what, __FILE__, __LINE__)
-
+extern unsigned char __STACK_TOP;
+extern const uint32_t _STACK_TOP;
 
 [[noreturn]]
-void _mbr_return();
-
-[[noreturn]]
-void _mbr_transfer_control_flow(const mbr_entry_t*);
-
-//int invoke_vbr(stos_request_header_t*, uint8_t vbr_disk, uint32_t vbr_lba);
+void panic(const char* msg);
 
 
-void memory_dump(const void*, size_t);
-
-
-void sleep(uint32_t milliseconds);
-void nanosleep(int64_t ns);
-
-
-
-/*
-extern unsigned const char __bootloader_begin;
-extern unsigned const char __bootloader_end;
-extern unsigned const char __bootloader_size;
-extern unsigned const char STACK_TOP;
-*/
-extern unsigned const char MBR_VERSION;
-
+void check_canary();
 
 _EXTERN_C_END_
-
-
-
-
-
-
-#endif //!_BOOTLOADER_H_

@@ -19,9 +19,15 @@
 
 
 
-extern interrupt_smol
+;//global storage memory map
 
-%macro int16 1
-	push dword %1
-	call dword interrupt_smol
-%endmacro
+%define DATA_IS_IN_VBR_MODE           byte  [0x501]
+%define DATA_DX_BACKUP                word  [0x502]
+	%define DATA_DL_BACKUP              byte  [0x502]
+	%define DATA_DH_BACKUP              byte  [0x503]
+%define DATA_ES_BACKUP                word  [0x504]
+%define DATA_DI_BACKUP                word  [0x506]
+%define DATA_DS_SI_CONTENTS_AREA      0x508
+%define DATA_LBA_PACKET_AREA          0x518
+%define DATA_CMOS_ADDRESSES_AREA      0x528
+;//next: 0x530

@@ -21,15 +21,7 @@
 
 #include <stddef.h>
 
-#include "defs.h"
 
 
-
-_EXTERN_C_
-
-void* malloc(size_t);
-void realloc(void*, size_t from, size_t to);
-void free(void* p, size_t);
-void* get_heap_top();
-
-_EXTERN_C_END_
+uint8_t* malloc(size_t);
+void free(void*, size_t);

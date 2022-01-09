@@ -25,7 +25,7 @@
 
 
 
-extern static uint8_t crc_lookup[256];
+extern uint32_t crc_lookup[256];
 
 
 
@@ -59,7 +59,7 @@ uint32_t crc32(const void* data, size_t size)
 
 
 
-static uint8_t crc_lookup[256] =
+uint32_t crc_lookup[256] =
 {
  0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA,
  0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,

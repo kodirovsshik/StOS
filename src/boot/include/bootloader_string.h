@@ -19,32 +19,21 @@
 
 
 
-#ifndef _VBR_H_
-#define _VBR_H_
-
 #include "defs.h"
-#include "mbr.h"
+#include <stdint.h>
+#include <stddef.h>
 
 
 
 _EXTERN_C_
 
-[[noreturn]]
-void halt();
 
+void* memset(void*, int, size_t);
+void* memset32(void*, uint32_t, size_t);
 
-mbr_entry_t* get_partition_table_entry();
+void* memcpy(void*, const void*, size_t);
 
+int memcmp(const void*, const void*, size_t);
 
-[[noreturn]]
-void native_boot();
-
-
-uint32_t rh_get_boot_options(stos_request_header_t*);
-uint32_t rh_boot            (stos_request_header_t*);
 
 _EXTERN_C_END_
-
-
-
-#endif //!_VBR_H_

@@ -34,10 +34,10 @@ SECTION .text
 
 ;//Sets carry if outdated CPU (no PM or CMOV) is detected
 INTEL_CPUID_ALGORITHM:
-	cli
-	clc
 	push word 0
 	pushf
+
+	cli
 
 	;//Check for 8086/80186
 	push sp
@@ -95,6 +95,7 @@ INTEL_CPUID_ALGORITHM:
 	;//Got CMOV
 
 	popfd
+	clc
 	ret
 .err:
 	popf

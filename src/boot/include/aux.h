@@ -19,14 +19,18 @@
 
 
 
-#include <stdint.h>
-#include "multiloader.h"
+#include "defs.h"
+#include <stddef.h>
 
 
 
-extern "C"
-uint32_t rh_boot(stos_request_header_t* req)
-{
-	(void)req;
-	return -1;
-}
+_EXTERN_C_
+
+
+//Why would i even bother building a cross compiler if it does not
+//not provide me a support library with all the functions implemented
+
+uint32_t udiv64_32(uint64_t, uint32_t);
+
+
+_EXTERN_C_END_

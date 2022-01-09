@@ -19,48 +19,19 @@
 
 
 
-;//DS:SI = C string ptr
-puts16:
+global udiv64_32
 
-%ifdef PUTC16_SMOL
 
-	mov ah, 0x0E
-	mov bx, 0x0007
-.loop:
-	lodsb
-	int 0x10
-	test al, al
-	jnz .loop
-	ret
 
-%else
 
-	push ax
-	push bx
-	mov ah, 0x0E
-	mov bx, 0x0007
-	cld
-	test si, si
-	jnz .loop
-	mov si, .msg_null
-.loop:
-	lodsb
-	test al, al
-	jz .end
 
-	int 0x10
+SECTION .text
+BITS 32
 
-	cmp al, 10
-	jne .loop
 
-	mov al, 13
-	int 0x10
-	jmp .loop
-.end:
-	pop bx
-	pop ax
-	ret
-.msg_null:
-db "(null)", 0
-
-%endif
+udiv64_32:
+	mov eax, [esp + 4]
+	mov edx, [esp + 8]
+	mov ecx, [esp + 12]
+	div ecx
+	retd
