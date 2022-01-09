@@ -19,22 +19,23 @@
 
 
 
-#include "mbr.h"
-#include "gpt.h"
-
-#include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stddef.h>
-#include <stdarg.h>
 #include <locale.h>
 #include <uchar.h>
 #include <inttypes.h>
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdarg.h>
+
 #include <chrono>
 #include <utility>
 #include <iterator>
+
+#include "mbr.h"
+#include "gpt.h"
 
 
 
