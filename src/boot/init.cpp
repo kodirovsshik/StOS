@@ -31,13 +31,13 @@ void init_memory_allocation();
 _EXTERN_C_
 
 [[noreturn]]
-void postinit();
+void invoke_main();
 
 [[noreturn]]
 void bootloader_init()
 {
 	init_memory_allocation();
-	postinit();
+	invoke_main();
 }
 
 _EXTERN_C_END_

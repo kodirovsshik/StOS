@@ -28,7 +28,6 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include <utility>
 
 
 #define _ERR_ARGS_COUNT 1
@@ -41,6 +40,15 @@
 #define _ERR_ARGS 8
 #define _ERR_INTERNAL 9
 #define _ERR_NO_STOS_MBR 10
+
+
+
+template<class A, class B>
+struct pod_pair
+{
+	A first;
+	B second;
+};
 
 
 
@@ -191,7 +199,7 @@ void copy_sector_selective(bool is_vbr, uint8_t dst, uint8_t src, uint64_t dst_l
 	//for MBR sectors, this place differs from VBR sectors and is occupied
 	//a by partition table and disk id and we would not want to overwrite it
 	if (is_vbr)
-		memcpy(&dst_sector.code3, &src_sector.code3, sizeof(vbr_t::code2));
+		memcpy(&dst_sector.code3, &src_sector.code3, sizeof(vbr_t::code3));
 
 	memcpy(&dst_sector.signature, &src_sector.signature, sizeof(vbr_t::signature));
 
@@ -400,7 +408,7 @@ int main(int argc, const char* const* argv)
 		return _ERR_ARGS_COUNT;
 	}
 
-	const std::pair<const char*, int(*)(int, const char* const*)> handlers[] =
+	const pod_pair<const char*, int(*)(int, const char* const*)> handlers[] =
 	{
 		{ "mbr", command_mbr },
 		{ "vbr", command_vbr },

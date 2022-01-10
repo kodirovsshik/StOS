@@ -30,14 +30,32 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-#include <chrono>
-#include <utility>
-#include <iterator>
+#include <sys/time.h>
 
 #include "mbr.h"
 #include "gpt.h"
 
 
+
+template<class A, class B>
+struct pod_pair
+{
+	A first;
+	B second;
+};
+
+uint64_t get_time_in_usec()
+{
+	struct timeval tv;
+	gettimeofday(&tv,NULL);
+	return (uint64_t)tv.tv_sec * 1000000 + tv.tv_usec;
+}
+
+template<class T, size_t N>
+size_t countof(const T(&)[N])
+{
+	return N;
+}
 
 void check(bool true_expr, int code, const char* fmt = "", ...)
 {
@@ -396,7 +414,7 @@ int subcommand_set_name(const char* str, gpt_entry_t& entry)
 	size_t len = strlen(str) + 1;
 	for (size_t rdi = 0; true; ++rdi)
 	{
-		check(rdi < std::size(entry.name), ERR_ARGS, "Unicode string must not exceed 32 UTF-16 code points");
+		check(rdi < countof(entry.name), ERR_ARGS, "Unicode string must not exceed 32 UTF-16 code points");
 
 		char16_t c;
 		size_t result = mbrtoc16(&c, str, len, &state);
@@ -423,7 +441,7 @@ int command_set(int argc, const char* const* argv)
 		return ERR_ARGS_COUNT;
 	}
 
-	const std::pair<const char*, int(*)(const char*, gpt_entry_t&)> handlers[] =
+	const pod_pair<const char*, int(*)(const char*, gpt_entry_t&)> handlers[] =
 	{
 		{ "type_str", subcommand_set_type_str },
 		{ "type_le",  subcommand_set_type_le },
@@ -467,30 +485,12 @@ int command_set(int argc, const char* const* argv)
 //	part[n].X = Y
 //	X = { type_str, type_le, guid_str, guid_le, first, last, flags, name }
 //delete #n
-//zero #n
 //wipe
 
 int main(int argc, const char* const* argv)
 {
-	using namespace std::chrono;
-	//I like chrono lib
-	srand((unsigned)duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count());
+	srand((unsigned)get_time_in_usec());
 	argv0 = argv[0];
-
-	/*
-	const char* const _argv[] =
-	{
-		nullptr,
-		"/home/kodirovsshik/os6/system/disk",
-		"create",
-		"0",
-		"36",
-		"39"
-	};
-
-	argv = _argv;
-	argc = sizeof(_argv) / sizeof(char*);
-	//*/
 
 	if (argc < 3)
 	{
@@ -502,13 +502,12 @@ int main(int argc, const char* const* argv)
 	disk_f = fopen(argv[1], "rb+");
 	check(disk_f, ERR_OPEN, "Failed to open %s", argv1);
 
-	const std::pair<const char*, int(*)(int, const char* const*)> handlers[] =
+	const pod_pair<const char*, int(*)(int, const char* const*)> handlers[] =
 	{
 		{ "table",  command_table },
 		{ "create", command_create },
 		{ "set",    command_set },
 		//{ "delete", command_delete },
-		//{ "zero",   command_zero },
 		//{ "wipe",   command_wipe },
 	};
 

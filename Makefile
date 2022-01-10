@@ -159,7 +159,7 @@ all: stos_loader_mbr stos_loader_vbr stos_loader_gpt
 
 
 rebuild: clean
-	make
+	$(MAKE)
 
 
 
@@ -304,18 +304,23 @@ system_wipe_disk_layout:
 
 
 
-define make_unpartitioned_disk
+define remake_partition_table
 	stat $(NOECHO) $(SYSTEM_DISK_FILE) ;\
 	if [ "$$?" = "1" ] ;\
 	then \
-		make system_wipe ;\
+		$(MAKE) system_wipe ;\
 	else \
-		make system_wipe_disk_layout ;\
+		$(MAKE) system_wipe_disk_layout ;\
 	fi ;
+	$(MAKE) $(1)
 endef
+
 system_create_mbr:
-	$(call make_unpartitioned_disk)
-	make _system_create_mbr
+	$(call remake_partition_table,_system_create_mbr)
+
+system_create_gpt:
+	$(call remake_partition_table,_system_create_gpt)
+
 
 _system_create_mbr: $(PARTITIONER_MBR)
 	$(PARTITIONER_MBR) $(SYSTEM_DISK_FILE) 1 0 0 0 0
@@ -323,11 +328,6 @@ _system_create_mbr: $(PARTITIONER_MBR)
 	$(PARTITIONER_MBR) $(SYSTEM_DISK_FILE) 3 0 0 0 0
 	$(PARTITIONER_MBR) $(SYSTEM_DISK_FILE) 4 0 0 0 0
 
-
-
-system_create_gpt:
-	$(call make_unpartitioned_disk)
-	make _system_create_gpt
 
 _system_create_gpt: $(PARTITIONER_GPT)
 	$(PARTITIONER_GPT) $(SYSTEM_DISK_FILE) table 128
@@ -337,18 +337,20 @@ _system_create_gpt: $(PARTITIONER_GPT)
 
 
 $(PARTITIONER_MBR): $(PARTITIONER_MBR).cpp
-	$(_CXX) $< -o $@ -g $(CC_INCLUDE_BOOT)
+	$(_CXX) $^ -o $@ -g $(CC_INCLUDE_BOOT)
 $(PARTITIONER_GPT): $(PARTITIONER_GPT).cpp $(CRC32_IMPL)
-	$(_CXX) $< -o $@ -g $(CC_INCLUDE_BOOT) $(CRC32_IMPL)
+	$(_CXX) $^ -o $@ -g $(CC_INCLUDE_BOOT)
 $(BURNER): $(BURNER).cpp
-	$(_CXX) $< -o $@ -g $(CC_INCLUDE_BOOT) src/boot/disk.cpp -include string.h
+	$(_CXX) $^ -o $@ -g $(CC_INCLUDE_BOOT) src/boot/disk.cpp -include string.h
+$(MBR_CHECKER): $(MBR_CHECKER).cpp
+	$(_CXX) $^ -o $@ -g
 
 
 
 define action_burn
-	stat $(NOECHO) $(SYSTEM_DISK_FILE) || make system_wipe
+	stat $(NOECHO) $(SYSTEM_DISK_FILE) || $(MAKE) system_wipe
 
-	$(2) $(SYSTEM_DISK_FILE) || make $(3)
+	$(2) $(SYSTEM_DISK_FILE) || $(MAKE) $(3)
 
 	$(BURNER) mbr $(SYSTEM_DISK_FILE) $(1)
 endef

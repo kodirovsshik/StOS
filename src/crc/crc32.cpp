@@ -25,10 +25,6 @@
 
 
 
-extern uint32_t crc_lookup[256];
-
-
-
 extern "C"
 uint32_t crc32_init()
 {
@@ -41,11 +37,15 @@ uint32_t crc32_update(const void* data, size_t size, uint32_t crc)
 	crc = ~crc;
 
 	auto* p = (const uint8_t*)data, *pe = p + size;
+
+	static constexpr uint32_t crc_polynomial = 0xEDB88320;
+	static constexpr uint32_t propagate_bit[2] = { 0x00000000, 0xFFFFFFFF };
+
 	while (p < pe)
 	{
-		crc = (crc >> 8) ^
-			crc_lookup[(crc & 0xFF) ^ *p];
-		++p;
+		crc ^= *p++;
+		for (int i = 8; i > 0; --i)
+			crc = (crc >> 1) ^ (crc_polynomial & propagate_bit[crc & 1]);
 	}
 
 	return ~crc;

@@ -40,7 +40,7 @@ int main(int argc, char** argv)
 
 	char gpt_signature[8] = { 0 };
 	fread(&gpt_signature, 1, 8, f);
-	if (strncmp(gpt_signature, "EFI PART", 8) != 0)
+	if (memcmp(gpt_signature, "EFI PART", 8) != 0)
 		return 1;
 
 	return 0;

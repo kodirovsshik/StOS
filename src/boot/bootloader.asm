@@ -24,7 +24,7 @@ global halt
 global _mbr_return
 global _mbr_transfer_control_flow
 global panic
-global postinit
+global invoke_main
 
 global global_canary
 global default_canary
@@ -110,8 +110,6 @@ db "32 bit CPU with CMOV is required to run StOS loader", 0
 str_memory_error:
 db "Low amount of memory, 64 KiB of memory if required to run StOS loader", 0
 
-str_a20_error:
-db "Failed to activate A20 line, check your BIOS settings", 0
 
 
 
@@ -165,15 +163,7 @@ error:
 
 .cpu:
 	push str_cpu_error
-	jmp .handler
-
-.memory:
-	push str_memory_error
-	jmp .handler
-
-.a20:
-	push str_a20_error
-	jmp .handler
+	;//jmp .handler
 
 .handler:
 	sti
@@ -286,7 +276,7 @@ BITS 16
 
 
 BITS 32
-postinit:
+invoke_main:
 	mov esp, __STACK_TOP
 	xor ebp, ebp
 	call main
