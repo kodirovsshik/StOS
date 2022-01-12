@@ -215,6 +215,8 @@ void disk_copy(uint8_t dst, uint8_t src, uint64_t dst_lba, uint64_t src_lba, siz
 		f_src = disk_find(src);
 		fseek(f_src, 0, SEEK_SET);
 	}
+	else
+		f_src = nullptr; //wtf why does gcc complain about it being uninitialized
 
 	while (true)
 	{

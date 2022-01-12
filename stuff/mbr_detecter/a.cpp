@@ -35,13 +35,10 @@ int main(int argc, char** argv)
 	if (mbr_signature != 0xAA55)
 		return 1;
 
-	if (!check_for_gpt)
-		return 0;
-
 	char gpt_signature[8] = { 0 };
 	fread(&gpt_signature, 1, 8, f);
-	if (memcmp(gpt_signature, "EFI PART", 8) != 0)
-		return 1;
-
-	return 0;
+	if (memcmp(gpt_signature, "EFI PART", 8) == 0)
+		return check_for_gpt ? 0 : 1;
+	else
+		return check_for_gpt ? 1 : 0;
 }
