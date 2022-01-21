@@ -19,11 +19,8 @@
 
 
 
-%include "include/mbr.inc"
+%include "mbr.inc"
 
-
-%define ADDR_LOAD_DELTA (0x7C00 - $$)
-%define ADDR_RELOCATION_DELTA (0xFE00 - $$)
 
 
 %ifdef _VBR_MODE
@@ -73,8 +70,8 @@ times 79 db 0
 
 	cli
 
-	xor ax, ax
-	mov ss, ax
+	xor cx, cx
+	mov ss, cx
 	mov sp, 0x508
 
 	push di
@@ -82,13 +79,28 @@ times 79 db 0
 	push dx
 
 	mov sp, __STACK_TOP
+
 	sti
+
+%if VBR_MODE
+	push cx
+	push ds
+	push si
+%endif
+
+	mov ds, cx
+	mov es, cx
 
 	cld
 
-	mov si, data.cmos_registers
-	mov di, DATA_CMOS_ADDRESSES_AREA
-	mov cx, 7
+	mov si, 0x7C00
+	mov di, ADDR_RELOC
+	inc ch
+	rep movsw
+
+	mov si, data.cmos_registers + ADDR_LOAD_DELTA
+	mov di, DATA_CMOS_CONTENTS_AREA
+	mov cx, 8
 .cmos_loop:
 	lodsb
 	out 0x70, al
@@ -97,10 +109,16 @@ times 79 db 0
 	loop .cmos_loop
 
 %if VBR_MODE
-	mov es, ax
+	pop ds
+	pop si
+
+	mov es, cx ;//0
 	mov di, DATA_DS_SI_CONTENTS_AREA
+
 	mov cx, 8
 	rep movsw
+
+	pop ds ;//0
 %else
 	mov di, DATA_LBA_PACKET_AREA
 %endif
@@ -117,7 +135,6 @@ times 79 db 0
 %if VBR_MODE
 	mov si, DATA_DS_SI_CONTENTS_AREA
 	times 2 movsw
-	xor ax, ax
 %else
 	inc ax
 	stosw
@@ -126,8 +143,6 @@ times 79 db 0
 %endif
 	times 2 stosw
 
-	xor ax, ax
-	mov ds, ax
 
 %if VBR_MODE
 	inc al
@@ -147,15 +162,18 @@ times 79 db 0
 
 read_err:
 	mov cx, data.msg_read_err_end - data.msg_read_err
-	mov si, data.msg_read_err
-	;//jmp print_err
+	mov si, data.msg_read_err + ADDR_LOAD_DELTA
+	;jmp print_err
 
 
 
-;//DF clear
 ;//CX = count
-;//DS:SI = string ptr
+;//SI = string ptr
 print_err:
+	mov ax, 0x0003
+	int 0x10
+	mov ax, 0x0500
+	int 0x10
 	mov ah, 0x0E
 	mov bx, 0x0007
 .loop:
@@ -163,15 +181,17 @@ print_err:
 	int 0x10
 	loop .loop
 .halt:
-	hlt
-	jmp .halt
+	xor ax, ax
+	int 0x16
+	int 0x18
+
+
+
+%include "cmos.inc"
 
 
 
 data:
-
-.cmos_registers:
-db 0, 2, 4, 6, 7, 8, 9
 
 .msg_read_err:
 db "Read error"

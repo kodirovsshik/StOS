@@ -41,6 +41,7 @@ QEMU32_CPU := base,+cmov
 QEMU64_CPU := base,+cmov,+lm
 override QEMU_COMMON_ARGS := -no-reboot -no-shutdown \
 	-drive file=$(SYSTEM_DISK_FILE),format=raw \
+	-device VGA,xmax=1280,ymax=720,xres=1280,yres=720,edid=on \
 	$(QEMU_ARGS)
 override QEMU32_COMMON_ARGS := -m size=$(QEMU32_MEMORY_MB) -cpu $(QEMU32_CPU)
 override QEMU64_COMMON_ARGS := -m size=$(QEMU64_MEMORY_MB) -cpu $(QEMU64_CPU)
@@ -55,10 +56,11 @@ override _NASM = nasm $(NASM_FLAGS) $(_NASM_FLAGS) -Wall -Werror -Wno-label-rede
 override NASM = $(_NASM) -I$(<D)
 
 
-ifeq ($(DEBUG),no)
-override DBG := -Os -DNDEBUG
-else
+DEBUG := yes
+ifeq ($(DEBUG),yes)
 override DBG := -g -DDEBUG
+else
+override DBG := -Os -DNDEBUG
 endif
 
 override _CC_ARGS := $(CC_ARGS) -std=c++20 -c -ffreestanding -mno-red-zone -Wall -Wextra -Werror -lgcc $(DBG)
@@ -75,7 +77,7 @@ CXX32 := i686-elf-g++
 CC := gcc
 CXX := g++
 
-override _CC_HOST_ARGS := -Wall -Wextra -Werror -std=c++20
+override _CC_HOST_ARGS := -Wall -Wextra -Werror -std=c++20 -O3 -g
 override _CC := $(CC) $(_CC_HOST_ARGS)
 override _CXX := $(CXX) $(_CC_HOST_ARGS)
 
@@ -104,11 +106,14 @@ STOS_LOADER_REQS += temp/boot/cpuid.asm.elf32
 STOS_LOADER_REQS += temp/boot/interrupt.asm.elf32
 STOS_LOADER_REQS += temp/boot/string.asm.elf32
 STOS_LOADER_REQS += temp/boot/aux.asm.elf32
+STOS_LOADER_REQS += temp/boot/io.asm.elf32
 
 STOS_LOADER_REQS += temp/boot/main.cpp.elf32
 STOS_LOADER_REQS += temp/boot/memory.cpp.elf32
 STOS_LOADER_REQS += temp/boot/bootloader.cpp.elf32
 STOS_LOADER_REQS += temp/boot/init.cpp.elf32
+STOS_LOADER_REQS += temp/boot/a20.cpp.elf32
+STOS_LOADER_REQS += temp/boot/video.cpp.elf32
 
 STOS_LOADER_ENTRY_MBR_OBJ := temp/boot/entry_mbr.asm.elf32
 STOS_LOADER_ENTRY_VBR_OBJ := temp/boot/entry_vbr.asm.elf32
@@ -239,10 +244,10 @@ $(INIT_BUILD_DIRS):
 
 
 temp/boot/%.asm.elf32: src/boot/%.asm $(INIT_BUILD_DIRS)
-	$(NASM) -f elf32 $< -o $@
+	$(NASM) -Isrc/boot/include -f elf32 $< -o $@
 
 temp/boot/%.asm.elf64: src/boot/%.asm $(INIT_BUILD_DIRS)
-	$(NASM) -f elf64 $< -o $@
+	$(NASM) -Isrc/boot/include -f elf64 $< -o $@
 
 temp/boot/shared/disk.cpp.elf32: src/boot/shared/disk.cpp $(INIT_BUILD_DIRS)
 	$(_CXX32) $< -o $@ $(CC_INCLUDE_BOOT) -include src/boot/shared/include/aux.h
@@ -289,12 +294,38 @@ run64v:
 
 
 
-system_wipe:
-	rm -rf $(SYSTEM_DISK_FILE) $(SYSTEM_DISK_FILE_VB)
-	mkdir -p system
+system_wipe_vbox_disk:
+	rm -rf $(SYSTEM_DISK_FILE_VB)
 
-	dd if=/dev/zero of=$(SYSTEM_DISK_FILE) bs=1M count=$(SYSTEM_DISK_SIZE)
-	VBoxManage internalcommands createrawvmdk -filename $(SYSTEM_DISK_FILE_VB) -rawdisk "$(LOCAL_PATH)/$(SYSTEM_DISK_FILE)" || true
+system_create_vbox_disk:
+	mkdir -p system
+	stat $(SYSTEM_DISK_FILE_VB) $(NOECHO) || VBoxManage internalcommands createrawvmdk -filename $(SYSTEM_DISK_FILE_VB) -rawdisk "$(LOCAL_PATH)/$(SYSTEM_DISK_FILE)" || true
+
+system_recreate_vbox_disk:
+	$(MAKE) system_wipe_vbox_disk
+	$(MAKE) system_create_vbox_disk
+
+
+
+system_wipe_disk:
+	rm -rf $(SYSTEM_DISK_FILE)
+
+system_create_disk:
+	mkdir -p system
+	stat $(SYSTEM_DISK_FILE) $(NOECHO) || dd if=/dev/zero of=$(SYSTEM_DISK_FILE) bs=1M count=$(SYSTEM_DISK_SIZE)
+
+system_recreate_disk:
+	$(MAKE) system_wipe_disk
+	$(MAKE) system_create_disk
+
+
+
+system_wipe:
+	$(MAKE) system_recreate_disk
+	$(MAKE) system_recreate_vbox_disk
+
+
+
 
 
 
@@ -337,13 +368,13 @@ _system_create_gpt: $(PARTITIONER_GPT)
 
 
 $(PARTITIONER_MBR): $(PARTITIONER_MBR).cpp
-	$(_CXX) $^ -o $@ -g $(CC_INCLUDE_BOOT)
+	$(_CXX) $^ -o $@ $(CC_INCLUDE_BOOT)
 $(PARTITIONER_GPT): $(PARTITIONER_GPT).cpp $(CRC32_IMPL)
-	$(_CXX) $^ -o $@ -g $(CC_INCLUDE_BOOT)
+	$(_CXX) $^ -o $@ $(CC_INCLUDE_BOOT)
 $(BURNER): $(BURNER).cpp
-	$(_CXX) $^ -o $@ -g $(CC_INCLUDE_BOOT) src/boot/disk.cpp -include string.h
+	$(_CXX) $^ -o $@ $(CC_INCLUDE_BOOT) src/boot/disk.cpp -include string.h
 $(MBR_CHECKER): $(MBR_CHECKER).cpp
-	$(_CXX) $^ -o $@ -g
+	$(_CXX) $^ -o $@
 
 
 

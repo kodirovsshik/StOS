@@ -35,3 +35,10 @@ udiv64_32:
 	mov ecx, [esp + 12]
 	div ecx
 	retd
+
+
+
+delay:
+	mov ecx, [esp + 4]
+	rep nop
+	retd

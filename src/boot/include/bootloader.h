@@ -27,6 +27,7 @@
 
 _EXTERN_C_
 
+
 extern unsigned char __STACK_TOP;
 extern const uint32_t _STACK_TOP;
 
@@ -35,5 +36,15 @@ void panic(const char* msg);
 
 
 void check_canary();
+
+
+void refresh_cmos_data();
+
+
+
+uint8_t get_boot_disk();
+uint8_t get_disks_count();
+uint8_t get_floppies_count();
+
 
 _EXTERN_C_END_

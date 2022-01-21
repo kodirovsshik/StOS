@@ -1,4 +1,4 @@
-#if 0
+%if 0
 	  This file is a part of StOS project - a small operating system
 	  	made for learning purposes
 	  Copyright (C) 2021 Egorov Stanislav, kodirovsshik@mail.ru, kodirovsshik@gmail.com
@@ -15,63 +15,24 @@
 
 	  You should have received a copy of the GNU General Public License
 	  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#endif
+%endif
 
 
 
-#ifndef _MBR_H_
-#define _MBR_H_
+%ifndef _CMOS_FETCH_INC_
+%define _CMOS_FETCH_INC_
 
+cmos_fetch:
+	mov si, .regs_data + CURRENT_LOAD_DELTA
+	mov di, DATA_CMOS_CONTENTS_AREA
+	mov cx, 8
+.loop:
+	lodsb
+	out 0x70, al
+	in al, 0x71
+	stosb
+	loop .loop
+.regs_data:
+db 0, 2, 4, 6, 7, 8, 0x32, 9
 
-
-#include <stdint.h>
-
-#include "defs.h"
-
-
-
-typedef struct
-{
-	uint8_t head;
-	uint8_t sec : 6;
-	uint16_t cyl : 10;
-} PACKED chs_t;
-
-static_assert(sizeof(chs_t) == 3);
-
-
-
-typedef struct
-{
-	uint8_t active;
-	chs_t start_chs;
-	uint8_t type;
-	chs_t end_chs;
-	uint32_t start_lba;
-	uint32_t count_lba;
-} PACKED mbr_entry_t;
-
-static_assert(sizeof(mbr_entry_t) == 16);
-
-
-
-typedef struct
-{
-	uint8_t code1[3];
-	uint8_t oem[8];
-	uint8_t bpb[79];
-	uint8_t code2[0x153];
-
-	uint8_t uid[6];
-	mbr_entry_t table[4];
-	union
-	{
-		uint8_t sig[2];
-		uint16_t signature;
-	};
-} PACKED mbr_t;
-
-static_assert(sizeof(mbr_t) == 512);
-
-
-#endif //!_MBR_H_
+%endif ;//!_CMOS_FETCH_INC_

@@ -1,4 +1,4 @@
-#if 0
+%if 0
 	  This file is a part of StOS project - a small operating system
 	  	made for learning purposes
 	  Copyright (C) 2021 Egorov Stanislav, kodirovsshik@mail.ru, kodirovsshik@gmail.com
@@ -15,63 +15,56 @@
 
 	  You should have received a copy of the GNU General Public License
 	  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#endif
+%endif
 
 
 
-#ifndef _MBR_H_
-#define _MBR_H_
+global inb
+global inw
+global ind
+
+global outb
+global outw
+global outd
 
 
 
-#include <stdint.h>
-
-#include "defs.h"
-
+SECTION .text
+BITS 32
 
 
-typedef struct
-{
-	uint8_t head;
-	uint8_t sec : 6;
-	uint16_t cyl : 10;
-} PACKED chs_t;
+inb:
+	mov dx, [esp + 4]
+	xor eax, eax
+	in al, dx
+	retd
 
-static_assert(sizeof(chs_t) == 3);
+inw:
+	mov dx, [esp + 4]
+	xor eax, eax
+	in ax, dx
+	retd
 
-
-
-typedef struct
-{
-	uint8_t active;
-	chs_t start_chs;
-	uint8_t type;
-	chs_t end_chs;
-	uint32_t start_lba;
-	uint32_t count_lba;
-} PACKED mbr_entry_t;
-
-static_assert(sizeof(mbr_entry_t) == 16);
+ind:
+	mov dx, [esp + 4]
+	in eax, dx
+	retd
 
 
+outb:
+	mov dx, [esp + 4]
+	mov al, [esp + 8]
+	out dx, ax
+	retd
 
-typedef struct
-{
-	uint8_t code1[3];
-	uint8_t oem[8];
-	uint8_t bpb[79];
-	uint8_t code2[0x153];
+outw:
+	mov dx, [esp + 4]
+	mov ax, [esp + 8]
+	out dx, ax
+	retd
 
-	uint8_t uid[6];
-	mbr_entry_t table[4];
-	union
-	{
-		uint8_t sig[2];
-		uint16_t signature;
-	};
-} PACKED mbr_t;
-
-static_assert(sizeof(mbr_t) == 512);
-
-
-#endif //!_MBR_H_
+outd:
+	mov dx, [esp + 4]
+	mov eax, [esp + 8]
+	out dx, eax
+	retd

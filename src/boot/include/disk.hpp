@@ -31,8 +31,6 @@
 
 
 
-#define DISK_END -1
-#define DISK_BEGIN (get_floppies_count() != 0 ? 0 : (get_disks_count() != 0 ? 0x80 : DISK_END))
 #define ERR_NO_LBA 1
 #define ERR_NO_MBR 2
 #define ERR_NO_PARTITION 3
@@ -61,6 +59,22 @@ _EXTERN_C_END_
 
 
 
+class disk_iterator_t
+{
+	static int floppies_count;
+	static int disks_count;
+	int disk_number;
+
+public:
+	disk_iterator_t();
+
+	void next();
+	bool valid() const;
+
+	uint8_t operator*() const;
+};
+
+
 
 struct mbr_partition_info_t
 {
@@ -87,9 +101,6 @@ struct partition_iterator_t
 	void next();
 	void reset();
 
-	uint32_t get_mbr_info(mbr_partition_info_t*) const;
-	uint32_t get_gpt_info(gpt_partition_info_t*) const;
-
 	uint32_t get_mbr_entry(mbr_entry_t*) const;
 	uint32_t get_gpt_entry(gpt_entry_t*) const;
 
@@ -101,15 +112,11 @@ private:
 struct disk_t
 {
 	uint32_t partitions_number = 0;
-	uint32_t stos_vbr_partition = 0;
-	uint16_t stos_vbr_version = 0;
 	uint8_t bios_number = 0xFF;
 	uint8_t init_status = 0xFF;
 	uint8_t read_status = 0;
 	bool has_mbr : 1 = false;
 	bool has_gpt : 1 = false;
-	bool stos_mbr : 1 = false;
-	bool stos_vbr : 1 = false;
 
 	uint8_t init(uint8_t disk);
 

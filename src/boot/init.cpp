@@ -25,7 +25,11 @@
 
 
 void init_memory_allocation();
+void init_a20();
+void init_video();
 
+
+extern bool need_a20;
 
 
 _EXTERN_C_
@@ -33,10 +37,15 @@ _EXTERN_C_
 [[noreturn]]
 void invoke_main();
 
+
 [[noreturn]]
 void bootloader_init()
 {
 	init_memory_allocation();
+
+	if (need_a20)
+		init_a20();
+
 	invoke_main();
 }
 

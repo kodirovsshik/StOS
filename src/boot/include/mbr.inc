@@ -29,5 +29,10 @@
 %define DATA_DI_BACKUP                word  [0x506]
 %define DATA_DS_SI_CONTENTS_AREA      0x508
 %define DATA_LBA_PACKET_AREA          0x518
-%define DATA_CMOS_ADDRESSES_AREA      0x528
-;//next: 0x530
+%define DATA_CMOS_CONTENTS_AREA       0x528
+%define DATA_BOOTSTRAP_CODE_LBA_AREA  0x530
+;//next: 0x538
+
+
+%define ADDR_LOAD_DELTA (0x7C00 - $$)
+%define ADDR_RELOCATION_DELTA (ADDR_RELOC - $$)

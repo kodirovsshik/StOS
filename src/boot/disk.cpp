@@ -30,6 +30,43 @@
 
 
 
+
+int disk_iterator_t::floppies_count = get_floppies_count();
+int disk_iterator_t::disks_count = get_disks_count();
+
+disk_iterator_t::disk_iterator_t()
+{
+	if (disk_iterator_t::floppies_count != 0)
+		this->disk_number = 0;
+	else if (disk_iterator_t::disks_count != 0)
+		this->disk_number = 0x80;
+	else
+		this->disk_number = -1;
+}
+
+void disk_iterator_t::next()
+{
+	if (this->disk_number == -1)
+		return;
+	++this->disk_number;
+	if (this->disk_number == disk_iterator_t::floppies_count)
+		this->disk_number = 0x80;
+	if (this->disk_number == 0x80 | disk_iterator_t::disks_count)
+		this->disk_number = -1;
+}
+bool disk_iterator_t::valid() const
+{
+	return this->disk_number != -1;
+}
+
+uint8_t disk_iterator_t::operator*() const
+{
+	return (uint8_t)this->disk_number;
+}
+
+
+
+
 static bool is_extended_type(uint8_t type)
 {
 	uint8_t types[] = { 0x05, 0x0F, 0x85 };
@@ -47,7 +84,7 @@ uint8_t disk_t::_init(uint8_t disk)
 {
 	memset(this, 0, sizeof(*this));
 	this->bios_number = disk;
-	uint8_t x, stos_mbr_size;
+	//uint8_t x;
 
 	{
 		mbr_bootloader_t t;
@@ -59,11 +96,7 @@ uint8_t disk_t::_init(uint8_t disk)
 
 		if (t.signature != 0xAA55)
 			return ERR_NO_MBR;
-
 		this->has_mbr = true;
-
-		if (strncmp(t.metadata.signature, "StOSboot", 8) == 0)
-			this->stos_mbr = true;
 
 		uint64_t extended_lba = 0;
 
@@ -78,22 +111,7 @@ uint8_t disk_t::_init(uint8_t disk)
 			{
 				if (this->has_gpt)
 					return ERR_CORRUPTED_PARTITION_TABLE;
-
-				gpt_header_t hdr;
-				if ((x = read_disk_lba(disk, 1, &hdr, 1)) != 0)
-				{
-					this->read_status = x;
-					continue;
-				}
-				if (strncmp(hdr.signature, "EFI PART", 8) == 0)
-				{
-					if (hdr.partition_table_entry_size != 128 ||
-					    hdr.partition_table_begin != 2)
-					    return ERR_NON_CONFORMING_GPT;
-					this->has_gpt = true;
-					this->partitions_number = hdr.partition_table_size;
-					break;
-				}
+				this->has_gpt = true;
 			}
 			else if (is_extended_type(type))
 			{
@@ -104,8 +122,24 @@ uint8_t disk_t::_init(uint8_t disk)
 			}
 		}
 
+		if (this->has_gpt)
+		{
+				gpt_header_t hdr;
+				read_guard(disk, 1, &hdr, 1);
+
+				if (memcmp(hdr.signature, "EFI PART", 8) == 0)
+				{
+					if (hdr.partition_table_entry_size != 128 || hdr.partition_table_begin != 2)
+					    return ERR_NON_CONFORMING_GPT;
+					this->partitions_number = hdr.partition_table_size;
+					break;
+				}
+				else
+					this->has_gpt = false;
+		}
+
 		uint32_t lba_offset = 0;
-		if (extended_lba != 0)
+		if (!this->has_gpt && extended_lba != 0)
 		{
 			size_t n = 4;
 			while (true)
@@ -119,98 +153,7 @@ uint8_t disk_t::_init(uint8_t disk)
 					break;
 			}
 		}
-
-		stos_mbr_size = t.metadata.size;
 	}
-
-	do
-	{
-		if (!this->stos_mbr)
-			break;
-
-		if (this->has_gpt)
-		{
-			const char stos_gpt_signature[] = "StOS bootloader ";
-			static_assert(sizeof(stos_gpt_signature) == 17, "");
-
-			{
-				gpt_entry_t table[4];
-				uint32_t current_lba = 1;
-				for (uint32_t i = 0; i < this->partitions_number; ++i)
-				{
-					if ((i & 3) == 0)
-						read_guard(disk, ++current_lba, &table, 1);
-					if (strncmp(table[i & 3].type_guid, stos_gpt_signature, 16) == 0)
-					{
-						this->stos_vbr_partition = i;
-						this->stos_vbr = true;
-						break;
-					}
-				}
-			}
-
-			if (this->stos_vbr)
-			{
-				gpt_partition_info_t info;
-				auto it = this->begin();
-
-				it.partition_number = this->stos_vbr_partition;
-				err_guard((uint8_t)it.get_gpt_info(&info));
-
-				vbr_t t;
-				read_guard(disk, info.first + stos_mbr_size - 1, &t, 1);
-				if (strncmp(t.metadata.signature, "StOSload", 8) == 0)
-					this->stos_vbr_version = t.metadata.version;
-				else
-				{
-					this->stos_vbr = false;
-					this->stos_vbr_partition = 0;
-				}
-			}
-		}
-		else
-		{
-			{
-				vbr_t vbr;
-				if ((x = read_disk_lba(disk, stos_mbr_size, &vbr, 1)) != 0)
-				{
-					this->read_status = x;
-					break;
-				}
-
-				if (strncmp(vbr.metadata.signature, "StOSload", 8) != 0)
-					continue;
-
-				this->stos_vbr_partition = -1;
-				this->stos_vbr = true;
-				this->stos_vbr_version = vbr.metadata.version;
-			}
-
-			for (auto it = this->begin(); it.valid(); it.next())
-			{
-				mbr_partition_info_t info;
-				auto x = (uint8_t)it.get_mbr_info(&info);
-				if (x == ERR_NO_PARTITION)
-					continue;
-
-				err_guard(x);
-
-				vbr_t vbr;
-				read_guard(disk, info.lba, &vbr, 1);
-
-				if (strncmp(vbr.metadata.signature, "StOSload", 8) != 0)
-					continue;
-
-				if (vbr.metadata.version <= this->stos_vbr_version)
-					continue;
-
-				this->stos_vbr_partition = it.partition_number;
-				this->stos_vbr = true;
-				this->stos_vbr_version = vbr.metadata.version;
-			}
-		}
-	} while (false);
-
 
 	return 0;
 }
@@ -277,22 +220,10 @@ int partition_iterator_t::_valid_for_partitions() const
 		return ERR_NO_PARTITIONS;
 
 	if (this->partition_number >= this->disk->partitions_number)
-		return ERR_UNINITIALIZED; //well in fact it is true only in corrupted objects, but close enough
+		return ERR_NO_PARTITION;
 
 	return 0;
 }
-uint32_t partition_iterator_t::get_mbr_info(mbr_partition_info_t* info) const
-{
-	mbr_entry_t result;
-	auto x = this->get_mbr_entry(&result);
-	if (x) return x;
-
-	//TODO: account for extended partition should I?
-	info->lba = result.start_lba;
-	info->size = result.count_lba;
-	info->type = result.type;
-	info->active = result.active & 0x80;
-	return x;
 }
 uint32_t partition_iterator_t::get_mbr_entry(mbr_entry_t* info) const
 {
@@ -337,18 +268,6 @@ uint32_t partition_iterator_t::get_mbr_entry(mbr_entry_t* info) const
 	memcpy(info, result, sizeof(mbr_entry_t));
 	return 0;
 }
-uint32_t partition_iterator_t::get_gpt_info(gpt_partition_info_t* info) const
-{
-	gpt_entry_t e, *p = &e;
-	auto x = this->get_gpt_entry(p);
-	if (x) return x;
-
-	memcpy(info->type, p->type_guid, 16);
-	info->first = p->first_lba;
-	info->last = p->last_lba;
-	info->flags = p->flags;
-	return x;
-}
 uint32_t partition_iterator_t::get_gpt_entry(gpt_entry_t* entry) const
 {
 	err_guard(this->_valid_for_partitions());
@@ -357,8 +276,8 @@ uint32_t partition_iterator_t::get_gpt_entry(gpt_entry_t* entry) const
 		return ERR_WRONG_PARTITION_TABLE_TYPE;
 
 	gpt_entry_t table[4];
-	read_guard(this->disk->bios_number, 2 + (this->partition_number >> 2), &table, 1);
+	read_guard(this->disk->bios_number, 2 + (this->partition_number / 4), &table, 1);
 
-	memcpy(entry, &table[this->partition_number & 3], sizeof(gpt_entry_t));
+	memcpy(entry, &table[this->partition_number % 4], sizeof(gpt_entry_t));
 	return 0;
 }

@@ -24,6 +24,7 @@
 #include "interrupt.h"
 #include "bootloader_string.h"
 #include "aux.h"
+#include "memory.h"
 
 #include <stdint.h>
 #include <stddef.h>
@@ -32,8 +33,8 @@
 
 struct memory_map_entry_t
 {
-	uint64_t begin;
-	uint64_t end;
+	uint32_t begin;
+	uint32_t end;
 };
 
 class memory_map_iterator_t
@@ -137,11 +138,16 @@ public:
 			if (this->bios_memory_map_entry.type != 1)
 				continue;
 
-			if (this->bios_memory_map_entry.begin & 0xFFFFFFFF00000000)
+			if (this->bios_memory_map_entry.begin > 0xFFFFFFFC)
 				continue;
 
 			if (regs.ecx >= 24 && (this->bios_memory_map_entry.flags & 3) != 1)
 				continue;
+
+			//We don't go above 2^32 bytes
+			uint64_t end = this->bios_memory_map_entry.begin + this->bios_memory_map_entry.size;
+			end = end & 0xFFFFFFFF00000000 ? 0xFFFFFFFC : end;
+			this->bios_memory_map_entry.size = end - this->bios_memory_map_entry.begin;
 
 			if (this->bios_memory_map_entry.size < min_block_size)
 				continue;
@@ -185,13 +191,6 @@ public:
 
 
 
-struct memory_block_descriptor_t
-{
-	uint32_t begin;
-	uint32_t end;
-	uint32_t top;
-	memory_block_descriptor_t *next, *prev;
-};
 
 static_assert( sizeof(memory_block_descriptor_t) == 20, "");
 static_assert(alignof(memory_block_descriptor_t) == 4 , "");
@@ -203,28 +202,33 @@ memory_block_descriptor_t* memory_blocks_end = nullptr;
 
 
 
+void handle_a20(uint32_t, uint32_t);
+
 void init_memory_block(uint32_t begin, uint32_t end)
 {
+	uint32_t top;
 	memory_block_descriptor_t* block;
 
-	uint32_t top;
-	if (memory_blocks_list == nullptr) [[unlikely]]
-	{
-		if (begin != 0)
-			panic("Memory initialization failed: First block does not start at 0");
+	if (begin == 0)
+		begin = _STACK_TOP;
 
-		begin += _STACK_TOP + sizeof(memory_block_descriptor_t);
+	handle_a20(begin, end);
+
+	if (memory_blocks_list == nullptr)
+	[[unlikely]]
+	{
+		block = (memory_block_descriptor_t*)begin;
+
+		begin += sizeof(memory_block_descriptor_t);
 		top = begin;
 
 		if (begin >= end)
 			panic("Memory initialization failed: Not enough low memory");
 
-		block = (memory_block_descriptor_t*)_STACK_TOP;
 		memory_blocks_list = block;
 	}
 	else [[likely]]
 	{
-		//Find some space in a first available block
 		memory_block_descriptor_t* current_block = memory_blocks_list;
 		while (current_block)
 		{
@@ -304,7 +308,7 @@ size_t align_up_allocation_size(size_t x)
 	return x;
 }
 
-uint8_t* malloc(size_t n)
+uint8_t* malloc_unsafe(size_t n)
 {
 	n = align_up_allocation_size(n);
 
@@ -314,12 +318,19 @@ uint8_t* malloc(size_t n)
 		uint32_t available = current_block->end - current_block->top;
 		if (available >= n)
 		{
-			memory_blocks_list = current_block;
 			current_block->top += n;
 			return (uint8_t*)(current_block->top - n);
 		}
 		current_block = current_block->next;
 	}
+
+	return nullptr;
+}
+uint8_t* malloc(size_t n)
+{
+	uint8_t* p = malloc_unsafe(n);
+	if (p != nullptr)
+		return p;
 
 	panic("Memory allocation failed");
 }
@@ -336,12 +347,14 @@ void free(void* p, size_t n)
 		else
 		{
 			if (pu + n == current_block->top)
-			{
-				memory_blocks_list = current_block;
 				current_block->top -= n;
-			}
 			break;
 		}
 	}
 }
 
+
+memory_block_descriptor_t* get_heap_state()
+{
+	return memory_blocks_list;
+}

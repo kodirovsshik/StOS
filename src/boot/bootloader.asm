@@ -19,12 +19,17 @@
 
 
 
+%include "mbr.inc"
+
+
+
 global bootloader_main_wrapper
 global halt
 global _mbr_return
 global _mbr_transfer_control_flow
 global panic
 global invoke_main
+global refresh_cmos_data
 
 global global_canary
 global default_canary
@@ -168,7 +173,9 @@ error:
 .handler:
 	sti
 
-	mov ax, 0x0003
+	mov ax, 0x0083
+	int 0x10
+	mov ax, 0x0500
 	int 0x10
 
 	mov si, str_error
@@ -281,4 +288,29 @@ invoke_main:
 	xor ebp, ebp
 	call main
 
+
+
+refresh_cmos_data:
+	pushad
+
+	cld
+	mov edi, DATA_CMOS_CONTENTS_AREA
+	mov esi, cmos_ports
+	mov ecx, 8
+
+.loop:
+	lodsb
+	out 0x70, al
+	in al, 0x71
+	stosb
+	loop .loop
+
+	popad
+
 BITS 16
+
+
+
+SECTION .rodata
+cmos_ports:
+db 0, 2, 4, 6, 7, 8, 0x33, 9

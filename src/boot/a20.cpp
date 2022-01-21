@@ -19,59 +19,51 @@
 
 
 
-#ifndef _MBR_H_
-#define _MBR_H_
+#include "memory.h"
+#include "bootloader.h"
+
+
+#define MEGABYTE (1 << 20)
+#define MEGABYTE_BIT MEGABYTE
 
 
 
-#include <stdint.h>
+bool need_a20 = false;
+bool a20_ready = false;
 
-#include "defs.h"
-
-
-
-typedef struct
+void handle_a20(uint32_t begin, uint32_t end)
 {
-	uint8_t head;
-	uint8_t sec : 6;
-	uint16_t cyl : 10;
-} PACKED chs_t;
+	if (a20_ready)
+		return;
 
-static_assert(sizeof(chs_t) == 3);
-
-
-
-typedef struct
-{
-	uint8_t active;
-	chs_t start_chs;
-	uint8_t type;
-	chs_t end_chs;
-	uint32_t start_lba;
-	uint32_t count_lba;
-} PACKED mbr_entry_t;
-
-static_assert(sizeof(mbr_entry_t) == 16);
-
-
-
-typedef struct
-{
-	uint8_t code1[3];
-	uint8_t oem[8];
-	uint8_t bpb[79];
-	uint8_t code2[0x153];
-
-	uint8_t uid[6];
-	mbr_entry_t table[4];
-	union
+	if (begin & MEGABYTE_BIT)
 	{
-		uint8_t sig[2];
-		uint16_t signature;
-	};
-} PACKED mbr_t;
+		need_a20 = true;
+		if (begin + MEGABYTE >= end)
+			return;
+	}
+	else
+	{
+		begin = (begin | (MEGABYTE_BIT - 1)) + 1;
+		if (begin >= end)
+			return;
+		need_a20 = true;
+	}
 
-static_assert(sizeof(mbr_t) == 512);
+	volatile uint32_t *p1 = (uint32_t*)(begin);
+	volatile uint32_t *p2 = (uint32_t*)(begin + MEGABYTE);
 
+	static constexpr uint32_t c1 = 0x00FF55AA, c2 = 0xAA55FF00;
 
-#endif //!_MBR_H_
+	*p1 = c1;
+	*p2 = c2;
+
+	if (*p2 - *p1 == c2 - c1)
+		a20_ready = true;
+}
+
+void init_a20()
+{
+	if (need_a20 && !a20_ready)
+		panic("Failed to activate A20 line");
+}

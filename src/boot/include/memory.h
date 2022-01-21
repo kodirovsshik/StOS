@@ -20,8 +20,27 @@
 
 
 #include <stddef.h>
+#include <stdint.h>
 
 
+
+#ifndef _MEMORY_H_
+#define _MEMORY_H_
+
+
+struct memory_block_descriptor_t
+{
+	uint32_t begin;
+	uint32_t end;
+	uint32_t top;
+	memory_block_descriptor_t *next, *prev;
+};
+
+memory_block_descriptor_t* get_heap_state();
 
 uint8_t* malloc(size_t);
+uint8_t* malloc_unsafe(size_t);
 void free(void*, size_t);
+
+
+#endif //!_MEMORY_H_

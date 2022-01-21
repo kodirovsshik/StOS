@@ -22,7 +22,6 @@
 %include "include/mbr.inc"
 
 
-%define ADDR_LOAD_DELTA (0x7C00 - $$)
 %define GPT_LOAD_ADDR 0x600
 
 
@@ -71,8 +70,13 @@ times 79 db 0
 
 	cld
 
-	mov si, data.cmos_registers + ADDR_LOAD_DELTA
-	mov di, DATA_CMOS_ADDRESSES_AREA
+	mov si, 0x7C00
+	mov di, ADDR_RELOC
+	inc ch
+	rep movsw
+
+	mov si, data.cmos_registers + ADDR_RELOCATION_DELTA
+	mov di, DATA_CMOS_CONTENTS_AREA
 	mov cx, 8
 .cmos_loop:
 	lodsb
@@ -81,41 +85,22 @@ times 79 db 0
 	stosb
 	loop .cmos_loop
 
-	;//Check for 8086/80186
-	push sp
-	pop ax
-	xor ax, sp
-	jnz error.cpu
-	;//Got at least 80286
-
-	pushf
-	pop ax
-	or ax, 0xF000
-	push ax
-	popf
-
-	pushf
-	pop ax
-	test ax, 0xF000
-	jz error.cpu
-	;//Got at least 80386 => got 32 bit instructions
-
-	push dword 0x200
-	popfd
-
 	mov ebp, GPT_LOAD_ADDR
-	push dword 0
-	push dword 1
+	o32 push byte 0
+	o32 push byte 1
 	push ebp
 	push dword 0x00010010
 	call read_lba
 	add sp, 16
 
-	cmp dword [bp], 'EFI '
-	jne error.gpt
-	cmp dword [bp + 4], 'PART'
+	mov si, bp
+	mov di, data.efi_part + ADDR_RELOCATION_DELTA
+	mov cx, 4
+	cmpsw
 	jne error.gpt
 
+	cmp dword [bp + 84], 128
+	jne error.gpt
 
 	mov ebx, [bp + 80] ;//GPT table entries count
 	xor edi, edi ;//Partition counter
@@ -142,12 +127,12 @@ times 79 db 0
 
 	mov ax, 4
 
-;//inner loop: loops through GPT entries inside an LBA
+;//inner loop: loops through GPT entries inside a single 512 bytes block
 .gpt_loop2:
 	pusha
 
 	mov si, bp
-	mov di, data.stos_bootloader - mbr + 0x7C00
+	mov di, data.stos_bootloader + ADDR_RELOCATION_DELTA
 	mov cx, 8
 	repe cmpsw
 
@@ -194,26 +179,23 @@ read_lba:
 
 
 error:
-.cpu:
-	mov cx, data.msg_cpu_err_end - data.msg_cpu_err
-	mov si, data.msg_cpu_err + ADDR_LOAD_DELTA
-	jmp .print
 .read:
 	mov cx, data.msg_read_err_end - data.msg_read_err
-	mov si, data.msg_read_err + ADDR_LOAD_DELTA
+	mov si, data.msg_read_err + ADDR_RELOCATION_DELTA
 	jmp .print
 .gpt:
-	mov cx, data.msg_gpt_err_end - data.msg_gpt_err
-	mov si, data.msg_gpt_err + ADDR_LOAD_DELTA
+	mov cx, data.msg_gpt_boot_err_end - data.msg_gpt_boot_err
+	mov si, data.msg_gpt_boot_err + ADDR_RELOCATION_DELTA
 	;jmp .print
 
 
 
-;//DF clear
 ;//CX = count
-;//DS:SI = string ptr
+;//SI = string ptr
 .print:
-	mov ax, 3
+	mov ax, 0x0003
+	int 0x10
+	mov ax, 0x0500
 	int 0x10
 	mov ah, 0x0E
 	mov bx, 0x0007
@@ -225,7 +207,6 @@ error:
 	xor ax, ax
 	int 0x16
 	int 0x18
-	;jmp .halt
 
 
 
@@ -237,6 +218,9 @@ db 0, 2, 4, 6, 7, 8, 0x32, 9
 .stos_bootloader:
 db "StOS bootloader "
 
+.efi_part:
+db "EFI PART"
+
 .msg_read_err:
 db "Read error", 13
 .msg_read_err_end:
@@ -245,9 +229,9 @@ db "Read error", 13
 db "Outdated CPU", 13
 .msg_cpu_err_end:
 
-.msg_gpt_err:
-db "Not a bootable GPT", 13
-.msg_gpt_err_end:
+.msg_gpt_boot_err:
+db "GPT not bootable", 13
+.msg_gpt_boot_err_end:
 
 
 

@@ -19,59 +19,63 @@
 
 
 
-#ifndef _MBR_H_
-#define _MBR_H_
-
-
-
-#include <stdint.h>
-
 #include "defs.h"
 
 
+void segoff_panic_func(const void* arg, const void* instance);
 
-typedef struct
+
+template<class T>
+class farptr_t
 {
-	uint8_t head;
-	uint8_t sec : 6;
-	uint16_t cyl : 10;
-} PACKED chs_t;
+public:
+	uint16_t offset;
+	uint16_t segment;
 
-static_assert(sizeof(chs_t) == 3);
-
-
-
-typedef struct
-{
-	uint8_t active;
-	chs_t start_chs;
-	uint8_t type;
-	chs_t end_chs;
-	uint32_t start_lba;
-	uint32_t count_lba;
-} PACKED mbr_entry_t;
-
-static_assert(sizeof(mbr_entry_t) == 16);
-
-
-
-typedef struct
-{
-	uint8_t code1[3];
-	uint8_t oem[8];
-	uint8_t bpb[79];
-	uint8_t code2[0x153];
-
-	uint8_t uid[6];
-	mbr_entry_t table[4];
-	union
+	farptr_t() {}
+	farptr_t(T* p)
 	{
-		uint8_t sig[2];
-		uint16_t signature;
-	};
-} PACKED mbr_t;
+		uint32_t x = (uint32_t)p;
+		if (x > 0x10FFEF)
+			segoff_panic_func(p, this);
 
-static_assert(sizeof(mbr_t) == 512);
+		this->segment = (x >> 4) & 0xFFFF;
+		this->offset = x & 0xF;
+	}
 
+	operator T*() const
+	{
+		return (T*)((this->segment << 4) + this->offset);
+	}
 
-#endif //!_MBR_H_
+	/*
+	T& operator[](size_t n) const
+	{
+		return ((T*)*this)[n];
+	}
+
+	T& operator*() const
+	{
+		return *(T*)*this;
+	}
+
+	T* operator+(ptrdiff_t d) const
+	{
+		return (T*)*this + d;
+	}
+	T* operator-(ptrdiff_t d) const
+	{
+		return (T*)*this + d;
+	}
+	*/
+
+	operator uint32_t() const
+	{
+		return uint32_t(this->operator T*());
+	}
+
+	uint32_t pure() const
+	{
+		return (uint32_t(this->segment) << 16) | this->offset;
+	}
+} PACKED;

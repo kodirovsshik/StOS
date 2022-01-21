@@ -20,11 +20,20 @@
 
 
 #include "bootloader.h"
+#include "smol_vec.hpp"
 
 
+
+void init_video();
 
 [[noreturn]]
 void main()
 {
-	panic("AAAAAA");
+
+	//const bool &vbr_mode = *(bool*)0x501;
+
+	
+
+	//while (1);
+	panic("Main returned");
 }

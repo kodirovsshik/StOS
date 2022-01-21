@@ -19,59 +19,15 @@
 
 
 
-#ifndef _MBR_H_
-#define _MBR_H_
+#ifndef _VIDEO_H_
+#define _VIODE_H_
 
 
-
-#include <stdint.h>
-
+//#include <stdint.h>
 #include "defs.h"
 
 
-
-typedef struct
-{
-	uint8_t head;
-	uint8_t sec : 6;
-	uint16_t cyl : 10;
-} PACKED chs_t;
-
-static_assert(sizeof(chs_t) == 3);
+void restore_video_state();
 
 
-
-typedef struct
-{
-	uint8_t active;
-	chs_t start_chs;
-	uint8_t type;
-	chs_t end_chs;
-	uint32_t start_lba;
-	uint32_t count_lba;
-} PACKED mbr_entry_t;
-
-static_assert(sizeof(mbr_entry_t) == 16);
-
-
-
-typedef struct
-{
-	uint8_t code1[3];
-	uint8_t oem[8];
-	uint8_t bpb[79];
-	uint8_t code2[0x153];
-
-	uint8_t uid[6];
-	mbr_entry_t table[4];
-	union
-	{
-		uint8_t sig[2];
-		uint16_t signature;
-	};
-} PACKED mbr_t;
-
-static_assert(sizeof(mbr_t) == 512);
-
-
-#endif //!_MBR_H_
+#endif //!_VIDEO_H_

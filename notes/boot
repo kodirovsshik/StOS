@@ -1,8 +1,52 @@
+Unified loader strat:
+	props:
+		No program-to-program control flow transitions
+		Code reuse
+	cons:
+		probably will have to abandon VBR mode
+		
+	notes:
+		Assemble entry sector depending on MBR or VBR build
+	boot strat:
+		Call int 15h,AX=2401h
+		Save regs and CMOS data into global storage
+		Load trampoline code to 0x600
+			for mbr, load specific sector
+			for vbr, load offsetted specific sector
+			for gpt, sector number is stored somewhere in metadata
+				//or perhaps we better parse?
+		Check for correct signature at the beginning of trampoline code
+	Trampoline:
+		Check CPU fitness (32 bit, cmov)
+			on error: int 18h
+		Check for 64 KiB of memory
+			on error: print, int 16h, int 18h
+		
+	
+		Init memory allocation
+		Construct boot options list
+			if in VBR mode, using boot partition only
+			if in MBR mode, using the whole system
+		If 0 boot options found:
+			int 18h
+		If 1 boot option found:
+			boot
+			on error, panic
+		If >1 boot options found, invoke boot manager
+			(re)init video
+			setup grub-like menu
+			let user select
+			update CMOS data
+			restore video
+			try to boot
+			on error, go back to menu
+			
 
 
 
 
-Remade:
+
+MBR/VBR split remade:
 	desc:
 		Bootloader stored in MBR
 		loader is stored both after the MBR and in compatible partitions
