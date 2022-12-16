@@ -1,0 +1,1 @@
+Implement debug build support in makefiles (-Werror, -O2, -g[dwarf])
