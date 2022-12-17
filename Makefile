@@ -41,6 +41,12 @@ QEMU32 := qemu-system-i386
 QEMU32_CPU := 486
 override _QEMU32 := $(QEMU32) $(QEMU_ARGS) $(QEMU32_ARGS) -cpu $(QEMU32_CPU) \
 	-m $(VM_MEMORY_MiB) -drive file="$(VM_DISK)",format=raw
+
+QEMU64 := qemu-system-x86_64
+QEMU64_CPU := 486,+lm
+override _QEMU64 := $(QEMU64) $(QEMU_ARGS) $(QEMU64_ARGS) -cpu $(QEMU64_CPU) \
+	-m $(VM_MEMORY_MiB) -drive file="$(VM_DISK)",format=raw
+
 override QEMU_DARGS := -s -S
 
 override export B := 1
@@ -90,7 +96,7 @@ $(VM_DISK):
 	dd if=/dev/zero of=$@ bs=1M count=$(VM_DISK_SIZE_MiB)
 	bash -c "echo -e 1M,\\\\nwrite | sfdisk $@" >/dev/null
 # ^^^ I hate myself for writing this ^^^
-#but it left -e in the output for fome reason without wrapping it with bash -c
+#but it keeps -e in the output for some reason if i don't wrap it with bash -c
 	sfdisk -A $@ 1
 
 define write_boot_record
@@ -100,18 +106,30 @@ define write_boot_record
 	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$$(($(3)+510)) skip=510 count=2
 endef
 
+define write_image
+	dd if=$(1) of=$(2) bs=512 conv=notrunc seek=$(3) oflag=seek_bytes
+endef
+
 vm-burn: $(VM_DISK) all
 	$(call write_boot_record,result/mbr.bin,"$(VM_DISK)",0)
 	$(call write_boot_record,result/pbr.bin,"$(VM_DISK)",$(MiB))
+	$(call write_image,result/loader.bin,"$(VM_DISK)",$$(($(MiB)+512)))
 
 vm-run32: vm-burn
 	$(_QEMU32)
+vm-run64: vm-burn
+	$(_QEMU64)
 
-vm-debug32: vm-burn
-	$(_QEMU32) -S -s & >/dev/null 2>&1 ;\
-	gdb -x gdb/defs.gdb -x gdb/init.gdb ;\
-	kill -9 $$!
+define vm_debug
+	$(1) -S -s & >/dev/null 2>&1 ;\
+	gdb -x gdb/defs.gdb -x $(2) -x gdb/init.gdb ;\
+	kill -9 $$! || true
+endef
 
-_vm-debug32:
-	chmod +x misc/launch_debug
-	misc/launch_debug "$(_QEMU32)" "gdb -x gdb/defs.gdb -x gdb/init.gdb"
+vm-debug16: vm-burn
+	$(call vm_debug,$(_QEMU32),gdb/init16.gdb)
+
+#vm-debug32: vm-burn
+#	$(call vm_debug,$(_QEMU32),gdb/init32.gdb)
+#vm-debug64: vm-burn
+#	$(call vm_debug,$(_QEMU64),gdb/init64.gdb)
