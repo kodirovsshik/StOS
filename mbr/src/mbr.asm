@@ -24,8 +24,6 @@ start:
     mov si, sp
 
     ;preserve for plug & play
-    push dx
-    push es
     push di
 
     mov es, ax
@@ -39,7 +37,7 @@ start:
 adjust_cs_ip:
     sti
 
-    mov bx, 0x7C00 + 512 - 2 - 64 - 16
+    mov bx, 0x600 + 512 - 2 - 64 - 16
     mov cx, 4
 
 read_loop:
@@ -49,19 +47,12 @@ read_loop:
     mov al, byte [bx]
     test al, al
     jns read_loop
-    mov si, bx
+    
+    lea si, [bx + 8]
+    mov di, lba.lba
+    times 2 movsw
 
-    ;mov ax, 0x0201
-    ;mov dh, [si + 1]
-    ;mov cl, [si + 2]
-    ;mov ch, [si + 3]
-    ;mov bx, 0x7C00
-
-		mov word [lba.size], 1
-		mov word [lba.dst_off], 0x7C00
-		mov word
-    mov ax, [
-
+    mov si, lba
     mov ah, 0x42
     int 0x13
     jc read_error
@@ -69,12 +60,10 @@ read_loop:
     jnz read_error
 
     pop di
-    pop es
-    pop dx
+    mov bp, bx
     xor ax, ax
     mov bx, ax
     mov cx, ax
-    mov bp, si
     jmp 0x0000:0x7C00
 
 read_error:
@@ -95,22 +84,19 @@ read_error:
 
 fail:
     int 0x18
-    jmp halt
-
+    ;jmp halt
 halt:
-    cli
-.hlt:
     hlt
-    jmp .hlt
+    jmp halt
 
 lba:
 	db 16
 	db 0
 .size:
-	dw 0
-.dst_seg:
-	dw 0
+	dw 1
 .dst_off:
+	dw 0x7C00
+.dst_seg:
 	dw 0
 .lba:
 	dq 0

@@ -28,10 +28,10 @@ start:
 
 	cli
 	mov ss, ax
-	mov sp, 0x7E00
+	mov sp, 0x7C00
 	sti
 
-	mov ax, 0x4200
+	mov ah, 0x42
 	mov si, lba
 	int 0x13
 	jc read_error
@@ -53,7 +53,6 @@ read_error:
     lodsb
     int 0x10
     loop .loop
-    cli
 .hlt:
     hlt
     jmp .hlt
