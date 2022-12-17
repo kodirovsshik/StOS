@@ -1,29 +1,36 @@
 
 override DETACHED := >/dev/null 2>&1 &
 
-override _CXX_ARGS := -Wall -Wextra
-override _NASM_ARGS := -Wall -Werror
+override _CXX_ARGS := -Wall
+override _NASM_ARGS := -Wall -Werror -Ox
+override _CXX_OTIME :=
+override _CXX_OSIZE :=
 
 ifeq ($(DEBUG),true)
-override _CXX_ARGS += -Werror -g
-_NASM_ARGS += -g
+override _CXX_ARGS += -Wextra -Werror -g -Og
+override _NASM_ARGS += -g
 else
-override _CXX_ARGS += -O3
+override _CXX_OTIME += -O3
+override _CXX_OSIZE += -Os
 endif
-#if statement is to go here
 
-override export _CXX := $(CXX) $(_CXX_ARGS)
+export _CXX_OSIZE
+export _CXX_OTIME
 
-export CXX_TARGET := x86_64-pc-elf-g++
-override CXX_TARGET := $(CXX_TARGET) $(CXX_TARGET_ARGS) -c $(_CXX_ARGS)
-override export CXX64 := $(CXX_TARGET) -m64
-override export CXX32 := $(CXX_TARGET) -m32
-override export CXX16 := $(CXX_TARGET) -m16
+override export _CXX := $(CXX) $(_CXX_ARGS) $(_CXX_OTIME)
 
-override export LINK_TARGET := $(CXX_TARGET)
+CXX_TARGET := x86_64-pc-elf-g++
+override _CXX_TARGET_ARGS := $(CXX_TARGET_ARGS) -c $(_CXX_ARGS)
+override export CXX64 := $(CXX_TARGET) -m64 $(_CXX_TARGET_ARGS)
+override export CXX32 := $(CXX_TARGET) -m32 $(_CXX_TARGET_ARGS)
+override export CXX16 := $(CXX_TARGET) -m16 $(_CXX_TARGET_ARGS)
 
-export NASM := nasm
-override export NASM := $(NASM) $(NASM_ARGS) $(_NASM_ARGS)
+override _CXX_TARGET_LINK_ARGS := $(CXX_TARGET_LINK_ARGS)
+override export LINK_TARGET := $(CXX_TARGET) $(_CXX_TARGET_LINK_ARGS)
+
+NASM := nasm
+override NASM := $(NASM) $(NASM_ARGS) $(_NASM_ARGS)
+export NASM
 
 override LAYOUT := result/layout
 
@@ -37,20 +44,16 @@ VM_DISK_SIZE_MiB := 8
 
 VM_MEMORY_MiB := 64
 
+override _QEMU_ARGS := $(QEMU_ARGS) -m $(VM_MEMORY_MiB) -drive file="$(VM_DISK)",format=raw
+
 QEMU32 := qemu-system-i386
 QEMU32_CPU := 486
-override _QEMU32 := $(QEMU32) $(QEMU_ARGS) $(QEMU32_ARGS) -cpu $(QEMU32_CPU) \
-	-m $(VM_MEMORY_MiB) -drive file="$(VM_DISK)",format=raw
+override _QEMU32 := $(QEMU32) $(_QEMU_ARGS) $(QEMU32_ARGS) -cpu $(QEMU32_CPU)
 
 QEMU64 := qemu-system-x86_64
 QEMU64_CPU := 486,+lm
-override _QEMU64 := $(QEMU64) $(QEMU_ARGS) $(QEMU64_ARGS) -cpu $(QEMU64_CPU) \
-	-m $(VM_MEMORY_MiB) -drive file="$(VM_DISK)",format=raw
+override _QEMU64 := $(QEMU64) $(_QEMU_ARGS) $(QEMU64_ARGS) -cpu $(QEMU64_CPU)
 
-override QEMU_DARGS := -s -S
-
-override export B := 1
-override export KiB := 1024
 override export MiB := 1048576
 
 
@@ -128,7 +131,6 @@ endef
 
 vm-debug16: vm-burn
 	$(call vm_debug,$(_QEMU32),gdb/init16.gdb)
-
 #vm-debug32: vm-burn
 #	$(call vm_debug,$(_QEMU32),gdb/init32.gdb)
 #vm-debug64: vm-burn
