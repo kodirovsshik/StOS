@@ -1,2 +1,7 @@
+
+#Do not include build results
 result/
 vm/
+
+#I edit files with nano time to time
+*.swp
