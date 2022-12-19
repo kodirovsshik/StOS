@@ -10,14 +10,14 @@ ifeq ($(DEBUG),true)
 override _CXX_ARGS += -Wextra -Werror -g -Og
 override _NASM_ARGS += -g
 else
-override _CXX_OTIME += -O3
-override _CXX_OSIZE += -Os
+override CXX_OTIME += -Ofast
+override CXX_OSIZE += -Oz
 endif
 
-export _CXX_OSIZE
-export _CXX_OTIME
+export CXX_OSIZE
+export CXX_OTIME
 
-override export _CXX := $(CXX) $(_CXX_ARGS) $(_CXX_OTIME)
+override export _CXX := $(CXX) $(_CXX_ARGS) $(CXX_OTIME)
 
 CXX_TARGET := x86_64-pc-elf-g++
 override _CXX_TARGET_ARGS := $(CXX_TARGET_ARGS) -c $(_CXX_ARGS)
@@ -25,12 +25,14 @@ override export CXX64 := $(CXX_TARGET) -m64 $(_CXX_TARGET_ARGS)
 override export CXX32 := $(CXX_TARGET) -m32 $(_CXX_TARGET_ARGS)
 override export CXX16 := $(CXX_TARGET) -m16 $(_CXX_TARGET_ARGS)
 
-override _CXX_TARGET_LINK_ARGS := $(CXX_TARGET_LINK_ARGS)
+override _CXX_TARGET_LINK_ARGS := $(CXX_TARGET_LINK_ARGS) -nostdlib -lgcc
 override export LINK_TARGET := $(CXX_TARGET) $(_CXX_TARGET_LINK_ARGS)
 
 NASM := nasm
 override NASM := $(NASM) $(NASM_ARGS) $(_NASM_ARGS)
 export NASM
+
+export OBJCOPY_TARGET := x86_64-pc-elf-objcopy
 
 override LAYOUT := result/layout
 

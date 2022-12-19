@@ -3,5 +3,8 @@
 result/
 vm/
 
+#Neither any intermediate results
+*.elf*
+
 #I edit files with nano time to time
 *.swp
