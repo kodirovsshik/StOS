@@ -61,7 +61,7 @@ override export MiB := 1048576
 
 
 
-.PHONY: all $(SUBDIRS) rebuild clean
+.PHONY: all $(SUBDIRS) rebuild clean reset wipe
 .PHONY: vm-create vm-clean vm-recreate vm-burn vm-run32 vm-debug32
 
 
@@ -77,6 +77,7 @@ clean:
 	for dir in $(SUBDIRS); do $(MAKE) -C $$dir clean; done
 
 reset: clean vm-clean
+wipe: reset
 
 $(SUBDIRS): $(LAYOUT)
 	$(MAKE) -C $@

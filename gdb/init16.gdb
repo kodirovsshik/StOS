@@ -13,6 +13,10 @@ set architecture i8086
 
 target remote localhost:1234
 
-break *0x70A
+symbol-file ./result/loader.bin.elf
+
+break halt
+break loader_main.prehalt
+
+break loader_main.a20
 c
-si
