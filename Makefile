@@ -1,29 +1,32 @@
 
-override DETACHED := >/dev/null 2>&1 &
+override DETACHED := >/dev/null 2>&1 & true
 
 override _CXX_ARGS := -Wall
 override _NASM_ARGS := -Wall -Werror -Ox
-override _CXX_OTIME :=
-override _CXX_OSIZE :=
+override CXX_OTIME :=
+override CXX_OSIZE :=
 
 ifeq ($(DEBUG),true)
 override _CXX_ARGS += -Wextra -Werror -g -Og
 override _NASM_ARGS += -g
 else
 override CXX_OTIME += -Ofast
-override CXX_OSIZE += -Oz
+override CXX_OSIZE += -Os
 endif
 
 export CXX_OSIZE
 export CXX_OTIME
 
-override export _CXX := $(CXX) $(_CXX_ARGS) $(CXX_OTIME)
+override export _CXX := $(CXX) $(CXX_OTIME) $(_CXX_ARGS)
 
 CXX_TARGET := x86_64-pc-elf-g++
-override _CXX_TARGET_ARGS := $(CXX_TARGET_ARGS) -c $(_CXX_ARGS)
-override export CXX64 := $(CXX_TARGET) -m64 $(_CXX_TARGET_ARGS)
-override export CXX32 := $(CXX_TARGET) -m32 $(_CXX_TARGET_ARGS)
-override export CXX16 := $(CXX_TARGET) -m16 $(_CXX_TARGET_ARGS)
+CXX64_TARGET := $(CXX_TARGET) -m64
+CXX32_TARGET := $(CXX_TARGET) -m32
+CXX16_TARGET := $(CXX_TARGET) -m16
+override _CXX_TARGET_ARGS := -c $(_CXX_ARGS) -ffreestanding -fno-exceptions -fno-rtti 
+override export CXX64 := $(CXX64_TARGET) $(CXX_TARGET_ARGS) $(CXX64_TARGET_ARGS) $(_CXX_TARGET_ARGS) -mno-red-zone
+override export CXX32 := $(CXX32_TARGET) $(CXX_TARGET_ARGS) $(CXX32_TARGET_ARGS) $(_CXX_TARGET_ARGS)
+override export CXX16 := $(CXX16_TARGET) $(CXX_TARGET_ARGS) $(CXX16_TARGET_ARGS) $(_CXX_TARGET_ARGS)
 
 override _CXX_TARGET_LINK_ARGS := $(CXX_TARGET_LINK_ARGS) -nostdlib -lgcc
 override export LINK_TARGET := $(CXX_TARGET) $(_CXX_TARGET_LINK_ARGS)
@@ -32,7 +35,7 @@ NASM := nasm
 override NASM := $(NASM) $(NASM_ARGS) $(_NASM_ARGS)
 export NASM
 
-export OBJCOPY_TARGET := x86_64-pc-elf-objcopy
+export OBJCOPY_TARGET := objcopy
 
 override LAYOUT := result/layout
 
@@ -127,7 +130,7 @@ vm-run64: vm-burn
 	$(_QEMU64)
 
 define vm_debug
-	$(1) -S -s & >/dev/null 2>&1 ;\
+	$(1) -S -s $(DETACHED) ;\
 	gdb -x gdb/defs.gdb -x $(2) -x gdb/init.gdb ;\
 	kill -9 $$! || true
 endef
