@@ -131,7 +131,7 @@ vm-run64: vm-burn
 
 define vm_debug
 	$(1) -S -s $(DETACHED) ;\
-	gdb -x gdb/defs.gdb -x $(2) -x gdb/init.gdb ;\
+	gdb -x gdb/defs.gdb -x $(2) -x gdb/init.gdb $(GDB_ARGS) ;\
 	kill -9 $$! || true
 endef
 

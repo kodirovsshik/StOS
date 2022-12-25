@@ -29,7 +29,11 @@ loader_begin:
 rodata:
 	.str_logo db 10, "StOS loader v1.0", 10, 0
 	.str_mem1 db " KiB (", 0
-	.str_mem2 db " MiB) total memory", 10, 0
+	.str_mem2 db " MiB) usable memory", 10, 0
+	.str_vbe db "VBE ", 0
+	.str_vbe_modes1 db " modes reported, ", 0
+	.str_vbe_modes2 db " modes usable", 10, 0
+
 
 
 align 4, db 0
@@ -46,7 +50,10 @@ edata: ;data to be exported later for kernel
 	.memory_at_16m dw 0
 	.e820_ok db 1
 	db 0
-	.io_ports: times 7 dw 0
+	.io_ports times 7 dw 0
+	.vbe_modes_ptr dw 0
+	.vbe_modes_count dw 0
+	.vbe_modes_count_reported dw 0
 
 
 
@@ -56,8 +63,10 @@ loader_main:
 	xor ax, ax
 	mov ds, ax
 	mov es, ax
+
+	mov sp, ax
+	mov ax, 0x7000
 	mov ss, ax
-	mov sp, 0x7E00
 
 	sti
 
@@ -91,11 +100,11 @@ loader_main:
 	popf
 	pushf
 	pop ax
-	and ax, 0xF000 
+	and ax, 0xF000
 	;I don't understand this one, why would all of them be 0 only on 80286?
 	jz err_unsupported_cpu ;80286 detected
 
-;Assume at least 80386 - 32 bit registers are present
+;Assume at least 80386 => 32 bit registers are present
 	pushfd
 	pop eax
 	mov ecx, eax
@@ -106,7 +115,7 @@ loader_main:
 	pop eax
 	cmp eax, ecx
 	je err_unsupported_cpu ;80386 detected
-	
+
 	;Restore AC bit
 	push ecx
 	popfd
@@ -124,7 +133,7 @@ loader_main:
 ;CPUID present
 	mov eax, 0x80000000
 	cpuid
-	mov ebx, 0x80000001 
+	mov ebx, 0x80000001
 	cmp eax, ebx ;need extended page 1 for long mode
 	jb err_unsupported_cpu
 
@@ -136,7 +145,7 @@ loader_main:
 .cpu_done:
 ;Supported CPU detected, CPU discovery done
 
-	mov esp, 0x7E00
+	xor esp, esp
 
 	push dword 0x200
 	popfd ;IF=1
@@ -145,6 +154,7 @@ loader_main:
 
 	call try_fill_memory_table_e820
 	jnc .memory_table_ok
+	;else use fallback methods
 	mov byte [edata.e820_ok], 0
 
 	call get_e801_info
@@ -152,13 +162,12 @@ loader_main:
 	jnc .memory_table_ok
 
 	jmp err_memory_detection
-	
+
 .memory_table_ok:
 
 	call get_memory_size_KiB
 	push eax
 
-	push eax
 	call put32u
 	mov si, rodata.str_mem1
 	call puts
@@ -170,7 +179,7 @@ loader_main:
 	mov si, rodata.str_mem2
 	call puts
 
-	call print_memory_map
+	;call print_memory_map
 
 
 	cmp byte [data.has_memory_over_1m], 1
@@ -195,15 +204,10 @@ loader_main:
 	call check_a20_slow
 	jc .a20_done
 
-	in al, 0x92
-	test al, 2
-	jnz a20_fail
-	or al, 2
-	and al, ~1
-	out 0x92, al
+	call try_enable_a20_port92
 	call check_a20_slow
 	jc .a20_done
-	
+
 	jmp a20_fail
 
 .a20_done:
@@ -212,16 +216,341 @@ loader_main:
 	mov cx, 7
 	rep movsw
 
+.vbe:
+	mov bx, ss
+	mov es, bx
+
+	sub sp, 512
+	mov di, sp
+	mov dword [ss:di], 0x32454256 ;'VBE2'
+	mov ax, 0x4F00
+	int 0x10
+
+	xor bx, bx
+	mov es, bx
+
+	cmp ax, 0x4F
+	jne vbe_err
+	inc byte [vbe_err.code]
+
+.vbe_print_rev:
+	mov si, rodata.str_vbe
+	call puts
+
+	xor eax, eax
+	mov al, [ss:di + 5]
+	call put32u
+
+	mov al, '.'
+	call putc
+
+	xor eax, eax
+	mov al, [ss:di + 4]
+	call put32u
+	call endl
+
+	cmp byte [ss:di + 5], 3
+	jb vbe_err_old
+
+.vbe_print_modes:
+	mov eax, [ss:di + 14]
+	call vbe_copy_video_modes
+
+	xor eax, eax
+	mov ax, [edata.vbe_modes_count_reported]
+	call put32u
+	mov si, rodata.str_vbe_modes1
+	call puts
+
+	xor eax, eax
+	mov ax, [edata.vbe_modes_count]
+	call put32u
+	mov si, rodata.str_vbe_modes2
+	call puts
+
+	push di
+	;call vbe_print_video_modes
+	pop di
+
+.vbe_print_oem:
+	mov si, [ss:di + 6]
+	mov ax, [ss:di + 8]
+	mov ds, ax
+	call puts
+	xor ax, ax
+	mov ds, ax
+	call endl
+
+.vbe2_test:
+	mov al, [ss:di + 5]
+	cmp al, 2
+	jb .vbe_done
+
+.vbe_print_vendor_name:
+	mov si, [ss:di + 22]
+	mov ax, [ss:di + 24]
+	mov ds, ax
+	call puts
+	xor ax, ax
+	mov ds, ax
+	call endl
+.vbe_print_product_name:
+	mov si, [ss:di + 26]
+	mov ax, [ss:di + 28]
+	mov ds, ax
+	call puts
+	xor ax, ax
+	mov ds, ax
+
+	mov al, ' '
+	call putc
+.vbe_print_product_rev:
+	mov si, [ss:di + 30]
+	mov ax, [ss:di + 32]
+	mov ds, ax
+	call puts
+	xor ax, ax
+	mov ds, ax
+	call endl
+
+.vbe_done:
+	add sp, 512
+	nop
+
+
 .prehalt:
 	jmp halt
 
 
 
+vbe_print_video_modes:
+	mov si, [edata.vbe_modes_ptr]
+	mov cx, [edata.vbe_modes_count]
+	test cx, cx
+.l:
+	jz .ret
+	lodsw
+	call wait_enter_hit
+	push si
+	push cx
+	call vbe_print_video_mode
+	pop cx
+	pop si
+	dec cx
+	jmp .l
+
+.ret:
+	ret
+
+
+
+;ax = video mode number
+vbe_print_video_mode:
+	push es
+	
+	sub sp, 256
+	mov di, sp
+	push ss
+	pop es
+
+	mov cx, ax
+	mov ax, 0x4f01
+	int 0x10
+
+	mov bx, [es:di]
+	and bx, 1
+	mov al, [bx + .su]
+	call putc
+
+	mov bx, [es:di]
+	shr bx, 2
+	and bx, 1
+	mov al, [bx + .tx]
+	call putc
+
+	mov bx, [es:di]
+	shr bx, 3
+	and bx, 1
+	mov al, [bx + .mc]
+	call putc
+
+	mov bx, [es:di]
+	shr bx, 4
+	and bx, 1
+	mov al, [bx + .tg]
+	call putc
+
+	mov bx, [es:di]
+	shr bx, 5
+	and bx, 1
+	mov al, [bx + .vx]
+	call putc
+
+	mov bx, [es:di]
+	shr bx, 7
+	and bx, 1
+	mov al, [bx + .lw]
+	call putc
+
+	mov al, ' '
+	call putc
+
+	xor eax, eax
+	mov ax, [es:di + 18]
+	call put32u
+
+	mov al, 'x'
+	call putc
+
+	xor eax, eax
+	mov ax, [es:di + 20]
+	call put32u
+
+	mov al, 'x'
+	call putc
+
+	xor eax, eax
+	mov al, [es:di + 25]
+	call put32u
+
+	mov al, ' '
+	call putc
+
+	xor eax, eax
+	mov al, [es:di + 27]
+	call put32u
+
+	call endl
+
+	add sp, 256
+	pop es
+	ret
+.su db "US" ;supported
+.tx db "tT" ;bios tty supported
+.mc db "MC" ;monochrome/color
+.tg db "TG" ;text/graphics
+.vx db "Vv" ;vga compatible
+.lw db "lL" ;linear frame buffer
+
+
+
+;eax = VbeFarPtr to modes array
+;modifies edata
+vbe_copy_video_modes:
+	pushad
+	sub sp, 256
+
+	push ax
+	
+	call heap_get_ptr
+	mov [edata.vbe_modes_ptr], ax
+	mov di, ax
+
+	xor ax, ax
+	mov es, ax
+	
+	pop ax
+
+	mov si, ax
+	shr eax, 16
+	mov ds, ax
+
+.l:
+	lodsw
+	cmp ax, 0xFFFF
+	je .le
+	inc word [es:edata.vbe_modes_count_reported]
+	call vbe_check_mode
+	jc .l
+	stosw
+	inc word [es:edata.vbe_modes_count]
+	jmp .l
+.le:
+
+	xor ax, ax
+	mov ds, ax
+
+	call heap_set_ptr
+
+	add sp, 256
+	popad
+	ret
+
+
+
+;ax = mode
+;CF=1 if bad
+;CF=0 if good
+vbe_check_mode:
+	pushad
+	push es
+	
+	push ss
+	pop es
+	sub sp, 256
+	mov di, sp
+
+	mov cx, ax
+	mov ax, 0x4F01
+	int 0x10
+	mov ax, [es:di]
+	test ax, 1
+	jz .bad
+
+.good:
+	clc
+	jmp .ret
+.bad:
+	stc
+.ret:
+	lea sp, [esp + 256]
+	pop es
+	popad
+	ret
+
+
+
+vbe_err:
+	mov si, .str
+	call puts
+
+	xor eax, eax
+	mov al, [.code]
+
+	push eax
+	call put32u
+	call endl
+
+	jmp halt
+.code:
+	db 0
+.str:
+	db "VBE error, counter: "
+
+
+
+vbe_err_old:
+	mov si, .str
+	call puts
+	jmp halt
+.str:
+	db "VBE 3.0 or newer required", 10, 0
 
 
 
 try_enable_a20_kb:
-	stc
+	ret
+
+
+
+try_enable_a20_port92:
+	in al, 0x92
+	test al, 2
+	jnz .ret
+	or al, 2
+	and al, ~1
+	out 0x92, al
+.ret:
 	ret
 
 
@@ -237,6 +566,7 @@ a20_fail:
 
 ;return:
 ;eax = memory size in KiB
+;destroys eax, bx, cx, edx
 get_memory_size_KiB:
 	xor eax, eax
 	mov bx, [edata.memory_map_addr]
@@ -472,7 +802,7 @@ print_memory_map:
 	test cx, 3
 	jnz .doloop
 
-	call getch
+	call wait_enter_hit
 
 .doloop:
 	loop .l1
@@ -486,6 +816,17 @@ print_memory_map:
 
 
 
+wait_enter_hit:
+	push ax
+.l:
+	call getch
+	cmp al, 13
+	jne .l
+	pop ax
+	ret
+
+
+	
 getch:
 	xor ah, ah
 	int 0x16
@@ -494,8 +835,12 @@ getch:
 
 
 print_cpu_data:
+	push es
 	sub sp, 52
 
+	mov ax, ss
+	mov ds, ax
+	mov es, ax
 	mov di, sp
 	mov si, sp
 	
@@ -553,11 +898,22 @@ print_cpu_data:
 	xor eax, eax
 	stosd
 
+.unpad: ;why does intel pad their CPU strings with spaces
+	mov al, [ds:si]
+	cmp al, ' '
+	jne .print
+	inc si
+	jmp .unpad
+
+.print:
 	call puts
 	call endl
 
 .ret:
+	xor ax, ax
+	mov ds, ax
 	add sp, 52
+	pop es
 	ret
 
 
@@ -568,7 +924,7 @@ try_fill_memory_table_e820:
 
 	;EBX = memory map index
 	;DI = current heap ptr (progressively advances after each int 0x15 call)
-	;AX, CX, DX used as temporaries
+	;AX, CX, DX used as temporaries or as arguments for interrupts
 
 	call heap_get_ptr
 	mov di, ax
@@ -682,12 +1038,10 @@ heap_set_ptr:
 ; uint16_t allocation size
 ;return AX = memory ptr
 linear_alloc:
-	push bx
-	mov bx, sp
-	mov bx, [bx + 4]
 	mov ax, [data.heap]
-	add [data.heap], bx
-	pop bx
+	add ax, [esp + 4]
+	mov [data.heap], ax
+	sub ax, [esp + 4]
 	ret 2
 
 
@@ -718,7 +1072,7 @@ putc:
 
 
 
-;si = C string ptr
+;ds:si = C string ptr
 ;destroys ax, bx, si
 puts:
 	lodsb
@@ -739,8 +1093,7 @@ put32X:
 .l1:
 	mov bx, ax
 	and bx, 0xF
-	add bx, .digits
-	mov bx, [bx]
+	mov bx, [bx + .digits]
 	push bx
 	shr eax, 4
 	loop .l1
@@ -757,6 +1110,7 @@ put32X:
 	db '0123456789ABCDEF'
 
 ;eax = number
+;destroys eax, ebx, cx, edx
 put32u:
 	xor cx, cx
 	mov ebx, 10
