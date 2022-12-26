@@ -19,7 +19,7 @@ export CXX_OTIME
 
 override export _CXX := $(CXX) $(CXX_OTIME) $(_CXX_ARGS)
 
-CXX_TARGET := x86_64-pc-elf-g++
+CXX_TARGET := x86_64-elf-g++
 CXX64_TARGET := $(CXX_TARGET) -m64
 CXX32_TARGET := $(CXX_TARGET) -m32
 CXX16_TARGET := $(CXX_TARGET) -m16
@@ -47,9 +47,9 @@ VM_DIR := vm
 VM_DISK := $(VM_DIR)/disk.bin
 VM_DISK_SIZE_MiB := 8
 
-VM_MEMORY_MiB := 64
+QEMU_MEMORY_MiB := 64
 
-override _QEMU_ARGS := $(QEMU_ARGS) -m $(VM_MEMORY_MiB) -drive file="$(VM_DISK)",format=raw
+override _QEMU_ARGS := $(QEMU_ARGS) -m $(QEMU_MEMORY_MiB) -drive file="$(VM_DISK)",format=raw
 
 QEMU32 := qemu-system-i386
 QEMU32_CPU := 486
@@ -65,7 +65,7 @@ override export MiB := 1048576
 
 
 .PHONY: all $(SUBDIRS) rebuild clean reset wipe
-.PHONY: vm-create vm-clean vm-recreate vm-burn vm-run32 vm-debug32
+.PHONY: vm-create vm-clean vm-recreate vm-burn qemu-run32 qemu-debug32
 
 
 all: $(SUBDIRS)
@@ -124,20 +124,23 @@ vm-burn: $(VM_DISK) all
 	$(call write_boot_record,result/pbr.bin,"$(VM_DISK)",$(MiB))
 	$(call write_image,result/loader.bin,"$(VM_DISK)",$$(($(MiB)+512)))
 
-vm-run32: vm-burn
+qemu-run32: vm-burn
 	$(_QEMU32)
-vm-run64: vm-burn
+qemu-run64: vm-burn
 	$(_QEMU64)
 
-define vm_debug
+define qemu_debug
 	$(1) -S -s $(DETACHED) ;\
 	gdb -x gdb/defs.gdb -x $(2) -x gdb/init.gdb $(GDB_ARGS) ;\
 	kill -9 $$! || true
 endef
 
-vm-debug16: vm-burn
-	$(call vm_debug,$(_QEMU32),gdb/init16.gdb)
-#vm-debug32: vm-burn
-#	$(call vm_debug,$(_QEMU32),gdb/init32.gdb)
-#vm-debug64: vm-burn
-#	$(call vm_debug,$(_QEMU64),gdb/init64.gdb)
+qemu-debug16: vm-burn
+	$(call qemu_debug,$(_QEMU32),gdb/init16.gdb)
+#qemu-debug32: vm-burn
+#	$(call qemu_debug,$(_QEMU32),gdb/init32.gdb)
+#qemu-debug64: vm-burn
+#	$(call qemu_debug,$(_QEMU64),gdb/init64.gdb)
+
+bochs-run32: vm-burn
+	bochs -qf bochs/conf32

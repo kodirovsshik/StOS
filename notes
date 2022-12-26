@@ -1,0 +1,3 @@
+build fails on nasm 2.14.smth due to not being able to assemble 
+	mov dword seg:[addr], value 
+which is a correct instruction
