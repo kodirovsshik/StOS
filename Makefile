@@ -19,7 +19,7 @@ export CXX_OTIME
 
 override export _CXX := $(CXX) $(CXX_OTIME) $(_CXX_ARGS)
 
-CXX_TARGET := x86_64-elf-g++
+CXX_TARGET := x86_64-pc-elf-g++
 CXX64_TARGET := $(CXX_TARGET) -m64
 CXX32_TARGET := $(CXX_TARGET) -m32
 CXX16_TARGET := $(CXX_TARGET) -m16
@@ -142,5 +142,10 @@ qemu-debug16: vm-burn
 #qemu-debug64: vm-burn
 #	$(call qemu_debug,$(_QEMU64),gdb/init64.gdb)
 
+define bochs_debug
+	rm -f $(VM_DISK).lock
+	bochs -qf $(1) || true
+endef
+
 bochs-run32: vm-burn
-	bochs -qf bochs/conf32
+	$(call bochs_debug,bochs/conf32)

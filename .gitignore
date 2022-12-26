@@ -8,3 +8,6 @@ vm/
 
 #I edit files with nano time to time
 *.swp
+
+#In case bochs crashes and leaves .lock file behind
+*.lock
