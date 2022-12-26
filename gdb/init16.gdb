@@ -18,6 +18,5 @@ symbol-file ./result/loader.bin.elf
 break halt
 break loader_main.prehalt
 
-break loader_main.vbe_print_modes
-break vbe_print_video_modes
+break try_fill_memory_table_e820
 c

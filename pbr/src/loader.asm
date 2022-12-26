@@ -41,6 +41,7 @@ data:
 	.heap dw 0x600 + __loader_img_size
 	.has_memory_over_1m db 0
 	db 0
+	.vbe_modes_count_reported dw 0
 
 align 4, db 0
 edata: ;data to be exported later for kernel
@@ -53,7 +54,6 @@ edata: ;data to be exported later for kernel
 	.io_ports times 7 dw 0
 	.vbe_modes_ptr dw 0
 	.vbe_modes_count dw 0
-	.vbe_modes_count_reported dw 0
 
 
 
@@ -179,9 +179,6 @@ loader_main:
 	mov si, rodata.str_mem2
 	call puts
 
-	;call print_memory_map
-
-
 	cmp byte [data.has_memory_over_1m], 1
 	jne .a20_done
 
@@ -252,12 +249,12 @@ loader_main:
 	cmp byte [ss:di + 5], 3
 	jb vbe_err_old
 
-.vbe_print_modes:
+.vbe_get_modes:
 	mov eax, [ss:di + 14]
 	call vbe_copy_video_modes
 
 	xor eax, eax
-	mov ax, [edata.vbe_modes_count_reported]
+	mov ax, [data.vbe_modes_count_reported]
 	call put32u
 	mov si, rodata.str_vbe_modes1
 	call puts
@@ -267,10 +264,6 @@ loader_main:
 	call put32u
 	mov si, rodata.str_vbe_modes2
 	call puts
-
-	push di
-	;call vbe_print_video_modes
-	pop di
 
 .vbe_print_oem:
 	mov si, [ss:di + 6]
@@ -302,8 +295,7 @@ loader_main:
 	xor ax, ax
 	mov ds, ax
 
-	mov al, ' '
-	call putc
+	call space
 .vbe_print_product_rev:
 	mov si, [ss:di + 30]
 	mov ax, [ss:di + 32]
@@ -314,6 +306,8 @@ loader_main:
 	call endl
 
 .vbe_done:
+	;call vbe_print_video_modes
+
 	add sp, 512
 	nop
 
@@ -347,7 +341,7 @@ vbe_print_video_modes:
 ;ax = video mode number
 vbe_print_video_mode:
 	push es
-	
+
 	sub sp, 256
 	mov di, sp
 	push ss
@@ -392,8 +386,7 @@ vbe_print_video_mode:
 	mov al, [bx + .lw]
 	call putc
 
-	mov al, ' '
-	call putc
+	call space
 
 	xor eax, eax
 	mov ax, [es:di + 18]
@@ -413,8 +406,7 @@ vbe_print_video_mode:
 	mov al, [es:di + 25]
 	call put32u
 
-	mov al, ' '
-	call putc
+	call space
 
 	xor eax, eax
 	mov al, [es:di + 27]
@@ -441,14 +433,14 @@ vbe_copy_video_modes:
 	sub sp, 256
 
 	push ax
-	
+
 	call heap_get_ptr
 	mov [edata.vbe_modes_ptr], ax
 	mov di, ax
 
 	xor ax, ax
 	mov es, ax
-	
+
 	pop ax
 
 	mov si, ax
@@ -459,7 +451,7 @@ vbe_copy_video_modes:
 	lodsw
 	cmp ax, 0xFFFF
 	je .le
-	inc word [es:edata.vbe_modes_count_reported]
+	inc word [es:data.vbe_modes_count_reported]
 	call vbe_check_mode
 	jc .l
 	stosw
@@ -484,7 +476,7 @@ vbe_copy_video_modes:
 vbe_check_mode:
 	pushad
 	push es
-	
+
 	push ss
 	pop es
 	sub sp, 256
@@ -569,29 +561,38 @@ a20_fail:
 ;destroys eax, bx, cx, edx
 get_memory_size_KiB:
 	xor eax, eax
-	mov bx, [edata.memory_map_addr]
+	mov si, [edata.memory_map_addr]
 	mov cx, [edata.memory_map_size]
 
 .l1:
-	cmp dword [bx + 16], 1
+	cmp dword [si + 16], 1
 	jne .next
-	test dword [bx + 20], 1
+	test dword [si + 20], 1
 	jz .next
-	mov edx, [bx + 8]
+	
+	mov edx, [si + 8]
+	mov ebx, [si + 12]
+	sub edx, [si + 0]
+	sbb ebx, [si + 4]
+
 	add edx, 512
 	pushf
+	
 	shr edx, 10
 	add eax, edx
-	mov edx, [bx + 12]
+	mov edx, [si + 12]
+	
 	popf
-	adc edx, 0
-	shl edx, 22
-	add eax, edx
+	
+	adc ebx, 0
+	shl ebx, 22
+	add eax, ebx
+
 .next:
-	add bx, 24
+	add si, 24
 	loop .l1
 
-.include_high: 
+.include_high:
 	xor edx, edx
 	mov dx, [edata.memory_at_1m]
 	add eax, edx
@@ -665,19 +666,19 @@ sleep:
 ;CF=0 otherwise
 _check_a20:
 	mov ax, 0xFF00
-	mov fs, ax
+	mov es, ax
 
 	wbinvd
-	mov dword ds:[0x0504], 0xAA550000
+	mov dword es:[0x1500], 0x55AA0000
 	wbinvd
-	mov dword fs:[0x1504], 0x55AA0000
+	mov dword ds:[0x0500], 0xAA550000
 
 	wbinvd
-	mov eax, fs:[0x1504]
+	mov eax, es:[0x1500]
 	wbinvd
-	sub eax, ds:[0x0504]
+	sub eax, ds:[0x0500]
 
-	mov fs, ax
+	mov es, ax
 	ret
 
 
@@ -720,8 +721,8 @@ try_fill_memory_table_int12:
 .ok:
 	shl eax, 10
 	push eax
-	call set_low_memory_size_KiB
-	
+	call set_low_memory_size
+
 	clc
 	ret
 
@@ -733,7 +734,7 @@ try_fill_memory_table_int12:
 	jb .fail
 	cmp ax, 640
 	jbe .ok
-	
+
 .fail:
 	stc
 	ret
@@ -742,7 +743,7 @@ try_fill_memory_table_int12:
 
 ;stack (callee-popped):
 ; uint32_t memory size (in bytes)
-set_low_memory_size_KiB:
+set_low_memory_size:
 	mov word [edata.memory_map_size], 1
 
 	push word 24
@@ -765,34 +766,31 @@ set_low_memory_size_KiB:
 print_memory_map:
 	mov si, [edata.memory_map_addr]
 	mov cx, [edata.memory_map_size]
-	
+
 .l1:
 	push cx
 
 	mov eax, [si + 4]
-	call put32X
+	call put32x
 	mov eax, [si]
-	call put32X
+	call put32x
 
-	mov al, ' '
-	call putc
+	call space
 
 	mov eax, [si + 12]
-	call put32X
+	call put32x
 	mov eax, [si + 8]
-	call put32X
+	call put32x
 
-	mov al, ' '
-	call putc
+	call space
 
 	mov eax, [si + 16]
-	call put32X
+	call put32x
 
-	mov al, ' '
-	call putc
+	call space
 
 	mov eax, [si + 20]
-	call put32X
+	call put32x
 
 	call endl
 
@@ -809,7 +807,7 @@ print_memory_map:
 
 	xor eax, eax
 	mov ax, [edata.memory_map_size]
-	call put32X
+	call put32x
 	call endl
 
 	ret
@@ -826,7 +824,7 @@ wait_enter_hit:
 	ret
 
 
-	
+
 getch:
 	xor ah, ah
 	int 0x16
@@ -843,7 +841,7 @@ print_cpu_data:
 	mov es, ax
 	mov di, sp
 	mov si, sp
-	
+
 	xor eax, eax
 	cpuid
 	mov eax, ebx
@@ -894,7 +892,7 @@ print_cpu_data:
 	stosd
 	mov eax, edx
 	stosd
-	
+
 	xor eax, eax
 	stosd
 
@@ -919,71 +917,164 @@ print_cpu_data:
 
 
 try_fill_memory_table_e820:
-	pushad
-	cld
+	mov bp, sp
+	and sp, 0xFFFC
 
-	;EBX = memory map index
-	;DI = current heap ptr (progressively advances after each int 0x15 call)
-	;AX, CX, DX used as temporaries or as arguments for interrupts
-
-	call heap_get_ptr
-	mov di, ax
+	sub sp, 24
+	mov di, sp
 
 	xor ebx, ebx
-
 	mov eax, 0x0000E820
 	mov ecx, 24
 	mov edx, 0x534D4150
 	int 0x15
-	
+
 	jc .ret0
 	cmp eax, 0x534D4150
 	jne .ret0
 
-	mov [edata.memory_map_addr], di
+	call heap_get_ptr
+	mov [edata.memory_map_addr], ax
 
+	xor ebx, ebx
 .loop:
+	mov eax, 0x0000E820
+	mov ecx, 24
+	mov edx, 0x534D4150
+	push es
+	push ss
+	pop es
+	int 0x15
+	pop es
+	jc .ret1
+	pushf
+
+	call .insert
+
+	popf
+	call .print
+
 	test ebx, ebx
 	jz .ret1
 
-	inc word [edata.memory_map_size]
+	call wait_enter_hit
 
-	cmp cx, 20
-	ja .loop1
-	
-.no_acpi3:
-	mov dword [di + 20], 1
-.loop1:
-	
-	mov ecx, [di + 0]
-	mov edx, [di + 4]
-	add ecx, [di + 8]
-	adc edx, [di + 12]
+	jmp .loop
 
-	test edx, edx
-	jnz .set_1m_flag
-	cmp ecx, 0x100000
-	jbe .skip_set_1m_flag
-
-.set_1m_flag:
-	mov byte [data.has_memory_over_1m], 1
-
-.skip_set_1m_flag:
-	mov ecx, 24
-	add di, cx
-	mov eax, 0x0000E820
-	mov edx, 0x534D4150
-	int 0x15
-	jnc .loop
 
 .ret1:
+	mov di, [edata.memory_map_addr]
 	call heap_set_ptr
-	popad
+	mov ax, [edata.memory_map_size]
+	shl ax, 3
+	sub di, ax
+	shl ax, 1
+	sub di, ax
+	mov [edata.memory_map_addr], di 
 	clc
-	ret
+	jmp .ret
 .ret0:
-	popad
 	stc
+.ret:
+	mov sp, bp
+	ret
+;of all the things, lambdas are literally the easiest thing in assembly
+;needs all gp regs as set after the interrupt
+;preserves all gp registers
+.insert:
+	pushad
+	
+	cmp cx, 20
+	ja .insert.after_acpi3
+	mov dword ss:[di + 20], 1
+.insert.after_acpi3:
+	test dword ss:[di + 20], 1
+	jz .insert.done
+	test dword ss:[di + 20], 2
+	jnz .insert.done
+
+	mov ecx, ss:[di + 0]
+	mov edx, ss:[di + 4]
+	add ecx, ss:[di + 8]
+	adc edx, ss:[di + 12]
+	mov ss:[di + 8], ecx
+	mov ss:[di + 12], edx
+
+	test edx, edx
+	jnz .insert.set_1m_flag
+	cmp ecx, 0x100000
+	jbe .insert.skip_set_1m_flag
+
+.insert.set_1m_flag:
+	mov byte [data.has_memory_over_1m], 1
+
+.insert.skip_set_1m_flag:
+	push ds
+
+	push ss
+	pop ds
+	mov si, di
+
+	;es=0
+	mov di, es:[edata.memory_map_addr]
+	
+	mov cx, 6
+	rep movsd
+	
+	pop ds
+
+	mov [edata.memory_map_addr], di
+	inc word [edata.memory_map_size]
+
+.insert.done:
+	popad
+	ret
+
+;needs all gp regs as set after the interrupt
+;preserves all gp registers
+.print:
+	pushad
+	pushfd
+
+	push ebx ;save for later
+
+	;print returned buffer size after call
+	mov eax, ecx
+	call put32u
+	call space
+
+	;print next cell value after call
+	pop eax ;ebx value
+	call put32u
+	call space
+
+	;print entry base address
+	mov eax, ss:[di + 4]
+	call put32x
+	mov eax, ss:[di + 0]
+	call put32x
+	call space
+
+	;print entry size
+	mov eax, ss:[di + 12]
+	call put32x
+	mov eax, ss:[di + 8]
+	call put32x
+	call space
+
+	;print type
+	mov eax, ss:[di + 16]
+	call put32u
+	call space
+
+	;print ACPI 3.0 flags
+	mov eax, ss:[di + 20]
+	call put32x
+
+	call endl
+
+	popfd
+	popad
 	ret
 
 
@@ -1057,6 +1148,10 @@ endl:
 
 
 
+;destroys ax, bx
+space:
+	mov al, ' '
+
 ;al = character
 ;destroys ax, bx
 putc:
@@ -1086,8 +1181,8 @@ puts:
 
 
 ;eax=number
-;destroys ax, bx, cx
-put32X:
+;destroys eax, bx, cx
+put32x:
 
 	mov cx, 8
 .l1:
