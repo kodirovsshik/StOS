@@ -40,7 +40,7 @@ export OBJCOPY_TARGET := objcopy
 override LAYOUT := result/layout
 
 override UTILS_SUBDIRS := binecho
-override SRC_SUBDIRS := mbr pbr
+override SRC_SUBDIRS := mbr loader
 override SUBDIRS := $(UTILS_SUBDIRS) $(SRC_SUBDIRS) 
 
 VM_DIR := vm

@@ -6,8 +6,11 @@ SECTIONS
   . = 0x600;
 	.text :
 	{
+		loader.asm.elf64(.text)
 		*(.text)
 	}
+
+  PROVIDE(loader_end = .);
 
   /* Stabs debugging sections.  */
   .stab         0 : { *(.stab) }

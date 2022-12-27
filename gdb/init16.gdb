@@ -18,5 +18,5 @@ symbol-file ./result/loader.bin.elf
 break halt
 break loader_main.prehalt
 
-break try_fill_memory_table_e820
+break loader_main
 c

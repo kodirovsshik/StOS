@@ -3,7 +3,16 @@ override PBR_BIN := ../result/pbr.bin
 override PBR_SRC := src/pbr.asm
 
 override LOADER_BIN := ../result/loader.bin
-override LOADER_OBJ := loader.asm.elf64
+override LOADER_OBJ :=
+override LOADER_OBJ += a20.asm.elf64
+override LOADER_OBJ += alloc.asm.elf64
+override LOADER_OBJ += cpu.asm.elf64
+override LOADER_OBJ += kbio.asm.elf64
+override LOADER_OBJ += loader.asm.elf64
+override LOADER_OBJ += memory.asm.elf64
+override LOADER_OBJ += print.asm.elf64
+override LOADER_OBJ += time.asm.elf64
+override LOADER_OBJ += vbe.asm.elf64
 
 all: $(PBR_BIN) $(LOADER_BIN)
 
