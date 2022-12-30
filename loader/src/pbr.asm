@@ -21,15 +21,21 @@ dd 0x00000600
 .loader_sector: dq 0 ;offset 98
 
 start:
-	
+	cli
 	xor ax, ax
 	mov ds, ax
 	mov es, ax
 
-	cli
 	mov ss, ax
 	mov sp, 0x7C00
 	sti
+
+	cld
+	mov di, 0x5F8
+	add si, 8
+	times 2 movsw
+	xor ax, ax
+	times 2 stosw
 
 	mov ah, 0x42
 	mov si, lba
@@ -61,7 +67,10 @@ read_error:
 
 
 pad:
-times 440 - ($ - entry) db 0xCC
+times 512 - 2 - 64 - 6 - 8 - ($ - entry) db 0xCC
+
+boot_hash: ;to be filled by loader at runtime
+dq 0
 
 disk_signature:
 times 6 db 0

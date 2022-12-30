@@ -1,89 +1,131 @@
 
-global data.heap
-global data.has_memory_over_1m
+;Here's where the real deal begins
+;The plan:
+;✓	Flex off with cool loading message
+;✓		Just display some loading message really
+;✓	Perform CPU discovery
+;✓		64-bit-capable CPU is required
+;	Check for available memory
+;✓		Perform memory discovery
+;		Check for region [1 mb; 1mb + X) to be available
+;	Enable A20 pin
+;✓	Calculate boot signature
+;✓		Use various CMOS data to create signature of boot time
+;✓		Write it to partition boot record of partition we boot from
+;✓		Save it for kernel for it to be able to find root partition
+;	Setup reasonable video mode with VBE
+;✓		Check for VBE 3.0 support
+;		Find compliant video modes (Supported, RBG, 24 bit or wider)
+;		If no found, stop booting
+;		Pick largest video mode not exceeding 768 in height
+;		If no found, pick the one with smallest height
+;	Setup protected mode environment
+;		Basic temporary GDT with 32-bit code and data segments
+;	Go 32 bit mode
+;		By this point, we should have already been using C++
+;	Setup 64-bit environment
+;		Identity page mapping for usable memory
+;		except for -2GB address space for the kernel
+;			[0xFFFFFFFF80000000; ...) -> [0x100000; ...),
+;		except for low 1 MiB
+;	Go 64 bit
+;	Setup -2GB address space mapping for the kernel
+;	Flex off with some PCI commands
+;		Probe PCI bus for storage devices
+;	Load kernel and transfer the control
+
+;Assumptions:
+;	loaded at 0x0000:0x0600
+;	DL = current BIOS disk number
+;	qword [PBR_LBA_ADDR] = pointer to partition's 8-byte LBA
+
+;Memory map:
+;	Segment 0x0000: code & data
+;		0x0600: loader
+;		0x7C00: PBR
+;	Segment 0x1000: stack space
+;	Segment 0x2000: output log buffer
+;
+;Conventions:
+;DS = CS = ES = 0, SS = stack segment
+;	except for small places in code where we need otherwise
+;
+
+%define PBR_LBA_ADDR 0x5F8
+
+
+;functions
+;global halt
+global panic
+
+;variables
+global edata.pbr_lba
+global edata.boot_signature
 global edata.memory_map_addr
 global edata.memory_map_size
 global edata.memory_at_1m
 global edata.memory_at_16m
 global edata.e820_ok
-global rodata.str_mem1
-global rodata.str_mem2
-global rodata.str_vbe
-global rodata.str_vbe_modes1
-global rodata.str_vbe_modes2
 global edata.vbe_modes_ptr
 global edata.vbe_modes_count
-global data.vbe_modes_count_reported
-global halt
+global bss.pbr_disk
 
+
+;functions
 extern puts
 extern check_cpu
 extern check_memory
 extern check_vbe
 extern activate_a20
+extern create_boot_signature
+
+;variables
+extern data.output_use_screen
+
+;data provided by linker
 extern loader_end
+extern bss_begin
+extern bss_size_w
+
+
+
+SECTION .rodata
+rodata:
+	.str_logo db 10, "StOS loader v1.0", 10, 0
+	.str_loader_end db "Error: loader end reached", 0
+	.str_panic db 10, "BOOTLOADER PANIC:", 10, 0
+
+
+
+SECTION .bss
+bss:
+	.pbr_disk resb 1
+
+
 
 SECTION .text
 BITS 16
 
-;Here's where the real deal begins
-;The plan:
-;	Flex off with cool loading message
-;	Perform CPU discovery
-;	Check for available memory
-;	Enable A20 pin
-;	Setup reasonable video mode with VBE
-;	Setup protected mode environment 
-;	Go 32 bit mode (Perhaps transfer the control over to C++?)
-;	Setup 64-bit environment
-;	Go 64 bit mode with identity page mapping
-;	Setup -2GB address space mapping for the kernel
-;	Flex off with some PCI commands
-;	Load kernel and transfer the control
-
-;Assumptions:
-;	loaded at 0x0000:0x0600
-
-
-
 loader_begin:
 	jmp loader_main
 
-
-rodata:
-	.str_logo db 10, "StOS loader v1.0", 10, 0
-	.str_mem1 db " KiB (", 0
-	.str_mem2 db " MiB) usable memory", 10, 0
-	.str_vbe db "VBE ", 0
-	.str_vbe_modes1 db " modes reported, ", 0
-	.str_vbe_modes2 db " modes usable", 10, 0
-
-
-
-align 4, db 0
-data:
-	.heap dw 0x600
-	.has_memory_over_1m db 0
-	db 0
-	.vbe_modes_count_reported dw 0
-
-align 4, db 0
-edata: ;data to be exported later for kernel
+align 8, nop
+edata: ;data structure to be read by kernel
+	.pbr_lba dq 0
+	.boot_signature dq 0
+	.vbe_modes_ptr dw 0
+	.vbe_modes_count dw 0
 	.memory_map_addr dw 0
 	.memory_map_size dw 0
 	.memory_at_1m dw 0
 	.memory_at_16m dw 0
 	.e820_ok db 1
-	db 0
-	.io_ports times 7 dw 0
-	.vbe_modes_ptr dw 0
-	.vbe_modes_count dw 0
-
 
 
 loader_main:
+	nop
 
-.setup_stack:
+.setup_memory_layout:
 	cli
 
 	xor ax, ax
@@ -91,10 +133,24 @@ loader_main:
 	mov es, ax
 
 	mov sp, ax
-	mov ax, 0x7000
+	mov ax, 0x1000
 	mov ss, ax
 
 	sti
+
+.clear_bss:
+	cld
+	mov di, bss_begin
+	mov cx, bss_size_w
+	xor ax, ax
+	rep stosw
+
+.store_pbr_data:
+	mov [bss.pbr_disk], dl
+
+	mov si, PBR_LBA_ADDR
+	mov di, edata.pbr_lba
+	times 4 movsw
 
 .logo:
 	mov ax, 0x0002
@@ -103,41 +159,47 @@ loader_main:
 	mov si, rodata.str_logo
 	call puts
 
-.setup_heap:
-	mov ax, loader_end + 3
-	and ax, ~3
-	mov [data.heap], ax
+.disable_screen_output:
+	mov byte [data.output_use_screen], 0
 
 .check_cpu:
-	cli
 	call check_cpu
 
 .check_memory:
 	call check_memory
 
-	cmp byte [data.has_memory_over_1m], 1
-	jne .a20_done
-
 .a20:
 	call activate_a20
-.a20_done:
-	nop
 
-.dump_bios_ports_data:
-	mov si, 0x400
-	mov di, edata.io_ports
-	mov cx, 7
-	rep movsw
+.boot_signature:
+	call create_boot_signature
 
 .vbe:
 	call check_vbe
 
+
+
 .prehalt:
-	jmp halt
+	mov si, rodata.str_loader_end
+	;jmp panic
 
+;si = str
+;noreturn
+panic:
+	mov byte [data.output_use_screen], 1
+	sti
+	
+	push si
+	mov si, rodata.str_panic
+	call puts
 
+	pop si
+	call puts
+	;jmp halt
 
+;noreturn
 halt:
+	mov byte [data.output_use_screen], 1
 	mov si, .str
 	call puts
 .x:

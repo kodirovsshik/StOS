@@ -1,5 +1,5 @@
 
-extern halt
+extern panic
 extern puts
 extern sleep
 
@@ -117,7 +117,6 @@ _check_a20:
 
 a20_fail:
 	mov si, .str
-	call puts
-	jmp halt
+	jmp panic
 .str:
-	db "Failed to activate A20 line", 10, 0
+	db "Failed to activate A20 line", 0

@@ -1,28 +1,39 @@
 
-extern halt
+extern panic
 extern puts
 extern endl
 extern put32u
 extern put32x
+extern putNx
 extern linear_alloc
 extern heap_get_ptr
 extern heap_set_ptr
-extern data.has_memory_over_1m
 extern edata.memory_map_addr
 extern edata.memory_map_size
 extern space
 extern edata.memory_at_1m
 extern edata.memory_at_16m
 extern edata.e820_ok
-extern rodata.str_mem1
-extern rodata.str_mem2
 
 global check_memory
 
+
+
+SECTION .bss
+bss:
+	.has_memory_over_1m resb 1
+
+
+
+SECTION .rodata
+rodata:
+	.str_mem1 db " KiB (", 0
+	.str_mem2 db " MiB) usable memory", 10, 0
+
+
+
 SECTION .text
 BITS 16
-
-extern err_memory_detection
 
 check_memory:
 
@@ -75,11 +86,11 @@ get_e801_info:
 
 	test ax, ax
 	setnz dl
-	or byte [data.has_memory_over_1m], dl
+	or byte [bss.has_memory_over_1m], dl
 
 	test bx, bx
 	setnz dl
-	or byte [data.has_memory_over_1m], dl
+	or byte [bss.has_memory_over_1m], dl
 
 	clc
 .ret:
@@ -173,7 +184,7 @@ try_fill_memory_table_e820:
 	call .insert
 
 	popf
-	;call .print
+	call .print
 
 	test ebx, ebx
 	jz .ret1
@@ -227,7 +238,7 @@ try_fill_memory_table_e820:
 	jbe .insert.skip_set_1m_flag
 
 .insert.set_1m_flag:
-	mov byte [data.has_memory_over_1m], 1
+	mov byte [bss.has_memory_over_1m], 1
 
 .insert.skip_set_1m_flag:
 	push ds
@@ -266,7 +277,8 @@ try_fill_memory_table_e820:
 
 	;print next cell value after call
 	pop eax ;ebx value
-	call put32u
+	mov cx, 2
+	call putNx
 	call space
 
 	;print entry base address
@@ -276,7 +288,7 @@ try_fill_memory_table_e820:
 	call put32x
 	call space
 
-	;print entry size
+	;print entry top address
 	mov eax, ss:[di + 12]
 	call put32x
 	mov eax, ss:[di + 8]
@@ -290,7 +302,8 @@ try_fill_memory_table_e820:
 
 	;print ACPI 3.0 flags
 	mov eax, ss:[di + 20]
-	call put32x
+	mov cx, 2
+	call putNx
 
 	call endl
 
@@ -350,7 +363,6 @@ get_memory_size_KiB:
 
 err_memory_detection:
 	mov si, .str
-	call puts
-	jmp halt
+	jmp panic
 .str:
-	db "Memory discovery failure", 10, 0
+	db "Memory discovery failure", 0

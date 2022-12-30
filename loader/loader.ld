@@ -6,11 +6,27 @@ SECTIONS
   . = 0x600;
 	.text :
 	{
-		loader.asm.elf64(.text)
+		tmp/loader.asm.elf64(.text)
 		*(.text)
 	}
+  .data :
+  {
+    *(.data)
+    *(.rodata)
+  }
 
+  . = ALIGN(8);
+
+  PROVIDE(bss_begin = .);
+  .bss :
+  {
+    *(.bss)
+  }
+  
+  . = ALIGN(4);
   PROVIDE(loader_end = .);
+  PROVIDE(bss_size_w = (. - bss_begin) / 2);
+
 
   /* Stabs debugging sections.  */
   .stab         0 : { *(.stab) }

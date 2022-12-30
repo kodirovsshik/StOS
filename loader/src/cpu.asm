@@ -1,5 +1,5 @@
 
-extern halt
+extern panic
 extern puts
 extern endl
 
@@ -10,7 +10,8 @@ BITS 16
 
 ;Intel's algorithm
 check_cpu:
-
+	;jmp .check_done
+	cli
 ;Assume at least 8086
 	pushf
 	pop ax
@@ -22,7 +23,7 @@ check_cpu:
 	pop ax
 	and ax, 0xF000
 	cmp ax, 0xF000
-	je err_unsupported_cpu ;8086 detected
+	je err_unsupported_cpu ;8086/80186 detected
 
 ;Assume at least 80286
 	or cx, 0xF000
@@ -65,17 +66,17 @@ check_cpu:
 	cpuid
 	mov ebx, 0x80000001
 	cmp eax, ebx ;need extended page 1 for long mode
-	;jb err_unsupported_cpu
+	jb err_unsupported_cpu
 
 	mov eax, ebx
 	cpuid
 	test edx, 1 << 29 ;long mode bit
-	;jz err_unsupported_cpu
+	jz err_unsupported_cpu
 
 ;Supported CPU detected, CPU discovery done
-.done:
-	shl eax, 16
-	shr eax, 16
+.check_done:
+	shl esp, 16
+	shr esp, 16
 
 	push dword 0x200
 	popfd ;IF=1
@@ -150,7 +151,7 @@ print_cpu_data:
 	xor eax, eax
 	stosd
 
-.unpad: ;why does intel pad their CPU strings with spaces
+.unpad: ;why do Intel pad their CPU strings with spaces
 	mov al, [ds:si]
 	cmp al, ' '
 	jne .print
@@ -174,7 +175,6 @@ err_unsupported_cpu:
 	push word 0x200
 	popf
 	mov si, .str
-	call puts
-	jmp halt
+	jmp panic
 .str:
-	db "Unsupported CPU detected, 64 bit support required", 10, 0
+	db "Unsupported CPU detected, 64 bit support required", 0

@@ -1,14 +1,19 @@
 
-SECTION .text
-BITS 16
+extern loader_end
 
 global heap_get_ptr
 global heap_set_ptr
 global linear_alloc
 
-extern data.heap
 
 
+SECTION .data
+data:
+	.heap dw loader_end
+
+
+SECTION .text
+BITS 16
 
 ;return AX = heap ptr
 heap_get_ptr:
