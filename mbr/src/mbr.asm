@@ -61,6 +61,7 @@ read_loop:
 
     pop di
     mov bp, bx
+    mov si, bx
     xor ax, ax
     mov bx, ax
     mov cx, ax
