@@ -2,7 +2,7 @@
 override DETACHED := >/dev/null 2>&1 & true
 
 override _CXX_ARGS := -Wall
-override _NASM_ARGS := -Wall -Werror -Ox
+override _NASM_ARGS := -Wall -Werror -Ox -Wno-unknown-warning
 override CXX_OTIME :=
 override CXX_OSIZE :=
 
@@ -49,14 +49,17 @@ VM_DISK_SIZE_MiB := 8
 
 VM_MEMORY_MiB := 64
 
-override _QEMU_ARGS := $(QEMU_ARGS) -m $(VM_MEMORY_MiB) -drive file="$(VM_DISK)",format=raw
+override _QEMU_ARGS := \
+	$(QEMU_ARGS) \
+	-m $(VM_MEMORY_MiB) \
+	-drive file="$(VM_DISK)",format=raw \
 
 QEMU32 := qemu-system-i386
 QEMU32_CPU := 486
 override _QEMU32 := $(QEMU32) $(_QEMU_ARGS) $(QEMU32_ARGS) -cpu $(QEMU32_CPU)
 
 QEMU64 := qemu-system-x86_64
-QEMU64_CPU := 486,+lm
+QEMU64_CPU := 486,+lm,+pae
 override _QEMU64 := $(QEMU64) $(_QEMU_ARGS) $(QEMU64_ARGS) -cpu $(QEMU64_CPU)
 
 override export MiB := 1048576
@@ -128,6 +131,8 @@ vm-run32: vm-burn
 	$(_QEMU32)
 vm-run64: vm-burn
 	$(_QEMU64)
+vm-run-kvm: vm-burn
+	$(_QEMU64) -cpu host --enable-kvm
 
 define vm_debug
 	$(1) -S -s $(DETACHED) ;\
