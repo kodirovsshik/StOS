@@ -5,50 +5,60 @@ extern sleep
 
 global activate_a20
 
+
+
 SECTION .text
 BITS 16
 
 
-
 activate_a20:
-
+	;first check if already done
 	call check_a20_fast
 	jc .a20_done
 
+	;then try BIOS method
 	mov ax, 0x2401
 	int 0x15
 	call check_a20_fast
 	jc .a20_done
 
-	call try_enable_a20_kb
+	;then try keyboard controller method
+	call try_enable_a20_keyboard_controller_method
 	call check_a20_slow
 	jc .a20_done
 
+	;then try 0xEE port method
 	in al, 0xEE
 	call check_a20_slow
 	jc .a20_done
 
+	;then try 0x92 port method
 	call try_enable_a20_port92
 	call check_a20_slow
 	jc .a20_done
 
+	;if none worked, give up
 	jmp a20_fail
 .a20_done:
 	ret
 
 
 
-try_enable_a20_kb:
+try_enable_a20_keyboard_controller_method:
 	ret
 
 
 
+;destroys al
 try_enable_a20_port92:
 	in al, 0x92
+	;Best practice to avoid using this method
+	;if A20 bit is already set
 	test al, 2
 	jnz .ret
+
 	or al, 2
-	and al, ~1
+	and al, ~1 ;bit 0 is fast reset
 	out 0x92, al
 .ret:
 	ret
@@ -115,6 +125,7 @@ _check_a20:
 
 
 
+;noreturn
 a20_fail:
 	mov si, .str
 	jmp panic

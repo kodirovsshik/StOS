@@ -6,7 +6,11 @@
 %define CMOS_MONTH 0x08
 %define CMOS_YEAR 0x09
 
-%define BOOT_SIG_STORE_ADDR (0x7C00 + 432)
+;PBR has a boot signature field in it
+;It is to be written by loader
+;and the PBR is them to be written to disk
+;and found be the kernel
+%define PBR_BOOT_SIG_FIELD_ADDR (0x7C00 + 432)
 
 extern panic
 extern puts
@@ -19,21 +23,37 @@ extern edata.boot_signature
 
 global create_boot_signature
 
+
+
 SECTION .rodata
 rodata:
 	.str_boot_signature_ok1: db "Written boot signature ", 0
 	.str_boot_signature_ok2: db " to disk ", 0
 	.str_boot_signature_ok3: db " at lba ", 0
 
+
+
+SECTION .data
+pbr_lba_packet:
+	db 16
+	db 0
+	dw 1
+	dd 0x00007C00
+.lba:
+	dq 0
+
+
+
 SECTION .text
 BITS 16
 
+
 create_boot_signature:
-	mov di, BOOT_SIG_STORE_ADDR
+	mov di, PBR_BOOT_SIG_FIELD_ADDR
 	xor bx, bx
 
-.pt1:
-	;boot signature part 1 CMOS regs:
+.create_low_dword:
+	;boot signature low dword's CMOS regs:
 	;00: seconds
 	;02: minutes
 	;04: hours
@@ -54,8 +74,8 @@ create_boot_signature:
 	stosd
 	mov [edata.boot_signature], eax
 
-.pt2:
-	;boot signature part 2 CMOS regs:
+.create_high_dword:
+	;boot signature high dword's CMOS regs:
 	;07: day
 	;08: month
 	;09: year
@@ -76,12 +96,12 @@ create_boot_signature:
 	stosd
 	mov [edata.boot_signature + 4], eax
 
-.load_lba:
+.store_lba:
 	mov si, edata.pbr_lba
 	mov di, pbr_lba_packet.lba
 	times 2 movsd
 
-.write:
+.write_pbr:
 	mov si, pbr_lba_packet
 	mov dl, [bss.pbr_disk]
 	mov ax, 0x4300
@@ -90,7 +110,7 @@ create_boot_signature:
 	test ah, ah
 	jnz err_boot_signature_write
 
-.ok:
+.report_results:
 	mov si, rodata.str_boot_signature_ok1
 	call puts
 	mov eax, [edata.boot_signature + 4]
@@ -114,23 +134,8 @@ create_boot_signature:
 
 	call endl
 
+.done:
 	ret
-
-pbr_lba_packet:
-	db 16
-	db 0
-	dw 1
-	dd 0x00007C00
-.lba:
-	dq 0
-
-
-
-err_boot_signature_write:
-	mov si, .str
-	jmp panic
-.str:
-	db "Boot disk write error", 0
 
 
 
@@ -140,9 +145,18 @@ cmos_read:
 	pushf
 	cli
 
-	and al, ~0x80
+	and al, ~0x80 ;clear the NMI DISABLE bit
 	out 0x70, al
 	in al, 0x71
 	
 	popf
 	ret
+
+
+
+;noreturn
+err_boot_signature_write:
+	mov si, .str
+	jmp panic
+.str:
+	db "Boot disk write error", 0

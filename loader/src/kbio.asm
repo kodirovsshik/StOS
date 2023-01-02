@@ -16,11 +16,12 @@ getch:
 
 
 
+;registers preserved
 wait_enter_hit:
 	push ax
-.l:
+.wait_key_press:
 	call getch
 	cmp al, 13
-	jne .l
+	jne .wait_key_press
 	pop ax
 	ret

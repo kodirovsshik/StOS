@@ -1,35 +1,36 @@
 
 override DETACHED := >/dev/null 2>&1 & true
 
-override _CXX_ARGS := -Wall
-override _NASM_ARGS := -Wall -Werror -Ox -Wno-unknown-warning
 override CXX_OTIME :=
 override CXX_OSIZE :=
 
 ifeq ($(DEBUG),true)
-override _CXX_ARGS += -Wextra -Werror -g -Og
+override _CXX_ARGS += -Wall -Wextra -Werror -g -Og
 override _NASM_ARGS += -g
 else
 override CXX_OTIME += -Ofast
 override CXX_OSIZE += -Os
 endif
 
+override _CXX_ARGS += -Wno-unused-function
+override _NASM_ARGS += -Wall -Werror -Ox -Wno-unknown-warning
+
 export CXX_OSIZE
 export CXX_OTIME
 
 override export _CXX := $(CXX) $(CXX_OTIME) $(_CXX_ARGS)
 
-CXX_TARGET := x86_64-pc-elf-g++
-CXX64_TARGET := $(CXX_TARGET) -m64
-CXX32_TARGET := $(CXX_TARGET) -m32
-CXX16_TARGET := $(CXX_TARGET) -m16
-override _CXX_TARGET_ARGS := -c $(_CXX_ARGS) -ffreestanding -fno-exceptions -fno-rtti 
-override export CXX64 := $(CXX64_TARGET) $(CXX_TARGET_ARGS) $(CXX64_TARGET_ARGS) $(_CXX_TARGET_ARGS) -mno-red-zone
-override export CXX32 := $(CXX32_TARGET) $(CXX_TARGET_ARGS) $(CXX32_TARGET_ARGS) $(_CXX_TARGET_ARGS)
-override export CXX16 := $(CXX16_TARGET) $(CXX_TARGET_ARGS) $(CXX16_TARGET_ARGS) $(_CXX_TARGET_ARGS)
+CXX_FOR_TARGET := x86_64-pc-elf-g++
+CXX64_FOR_TARGET := $(CXX_FOR_TARGET) -m64
+CXX32_FOR_TARGET := $(CXX_FOR_TARGET) -m32
+CXX16_FOR_TARGET := $(CXX_FOR_TARGET) -m16
+override _CXX_FOR_TARGET_ARGS := -c $(_CXX_ARGS) -ffreestanding -fno-exceptions -fno-rtti 
+override export CXX64 := $(CXX64_FOR_TARGET) $(CXX_FOR_TARGET_ARGS) $(CXX64_FOR_TARGET_ARGS) $(_CXX_FOR_TARGET_ARGS) -mno-red-zone
+override export CXX32 := $(CXX32_FOR_TARGET) $(CXX_FOR_TARGET_ARGS) $(CXX32_FOR_TARGET_ARGS) $(_CXX_FOR_TARGET_ARGS)
+override export CXX16 := $(CXX16_FOR_TARGET) $(CXX_FOR_TARGET_ARGS) $(CXX16_FOR_TARGET_ARGS) $(_CXX_FOR_TARGET_ARGS)
 
-override _CXX_TARGET_LINK_ARGS := $(CXX_TARGET_LINK_ARGS) -nostdlib -lgcc
-override export LINK_TARGET := $(CXX_TARGET) $(_CXX_TARGET_LINK_ARGS)
+override _LINKER_FOR_TARGET_ARGS := $(LINKER_FOR_TARGET_ARGS) -nostdlib
+override export LINKER_FOR_TARGET := $(CXX_FOR_TARGET) $(_LINKER_FOR_TARGET_ARGS)
 
 NASM := nasm
 override NASM := $(NASM) $(NASM_ARGS) $(_NASM_ARGS)
@@ -56,11 +57,11 @@ override _QEMU_ARGS := \
 
 QEMU32 := qemu-system-i386
 QEMU32_CPU := 486
-override _QEMU32 := $(QEMU32) $(_QEMU_ARGS) $(QEMU32_ARGS) -cpu $(QEMU32_CPU)
+override RUN_QEMU32 := $(QEMU32) $(_QEMU_ARGS) $(QEMU32_ARGS) -cpu $(QEMU32_CPU)
 
 QEMU64 := qemu-system-x86_64
 QEMU64_CPU := 486,+lm,+pae
-override _QEMU64 := $(QEMU64) $(_QEMU_ARGS) $(QEMU64_ARGS) -cpu $(QEMU64_CPU)
+override RUN_QEMU64 := $(QEMU64) $(_QEMU_ARGS) $(QEMU64_ARGS) -cpu $(QEMU64_CPU)
 
 override export MiB := 1048576
 
@@ -128,21 +129,24 @@ vm-burn: $(VM_DISK) all
 	$(call write_image,result/loader.bin,"$(VM_DISK)",$$(($(MiB)+512)))
 
 vm-run32: vm-burn
-	$(_QEMU32)
+	$(RUN_QEMU32)
 vm-run64: vm-burn
-	$(_QEMU64)
+	$(RUN_QEMU64)
 vm-run-kvm: vm-burn
-	$(_QEMU64) -cpu host --enable-kvm
+	$(RUN_QEMU64) -cpu host --enable-kvm
 
 define vm_debug
 	$(1) -S -s $(DETACHED) ;\
-	gdb -x gdb/defs.gdb -x $(2) -x gdb/init.gdb $(GDB_ARGS) ;\
+	gdb -x gdb/defs.gdb \
+		-x gdb/init.gdb \
+		-x $(2) \
+		$(GDB_ARGS) ;\
 	kill -9 $$! || true
 endef
 
 vm-debug16: vm-burn
-	$(call vm_debug,$(_QEMU32),gdb/init16.gdb)
+	$(call vm_debug,$(RUN_QEMU32),gdb/init16.gdb)
 #vm-debug32: vm-burn
-#	$(call vm_debug,$(_QEMU32),gdb/init32.gdb)
+#	$(call vm_debug,$(RUN_QEMU32),gdb/init32.gdb)
 #vm-debug64: vm-burn
-#	$(call vm_debug,$(_QEMU64),gdb/init64.gdb)
+#	$(call vm_debug,$(RUN_QEMU64),gdb/init64.gdb)

@@ -1,8 +1,8 @@
 
-override BIN := ../result/mbr.bin
-override SRC := src/mbr.asm
+override MBR_BIN := ../result/mbr.bin
+override MBR_SRC := src/mbr.asm
 
-$(BIN): $(SRC)
-	$(NASM) $(SRC) -o $(BIN)
+$(MBR_BIN): $(MBR_SRC)
+	$(NASM) $(MBR_SRC) -o $(MBR_BIN) -f bin
 
 clean:
