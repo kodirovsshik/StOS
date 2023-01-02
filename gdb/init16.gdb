@@ -3,8 +3,14 @@ define nint
 	nskip 2	
 end
 
-define ncall16
+#call 16 bit from 16 bit code
+define nc
 	nskip 3
+end
+
+#call 32 bit from 16 bit code
+define nc32
+	nskip 6
 end
 
 set disassembly-flavor intel
@@ -13,10 +19,10 @@ set architecture i8086
 
 target remote localhost:1234
 
-symbol-file ./result/loader.bin.elf
+add-symbol-file result/loader.bin.elf
 
 break loader_main.prehalt
 
 #break loader_main
-break create_boot_signature.ok
 c
+del bp $bpnum

@@ -3,6 +3,8 @@ extern loader_end
 
 global heap_get_ptr
 global heap_set_ptr
+global c_heap_get_ptr
+global c_heap_set_ptr
 global linear_alloc
 
 
@@ -12,10 +14,20 @@ data:
 	.heap dw loader_end
 
 
+
 SECTION .text
 BITS 16
 
-;return AX = heap ptr
+
+;return eax = heap ptr
+c_heap_get_ptr:
+	xor eax, eax
+	mov ax, [data.heap]
+	o32 ret
+
+
+
+;return ax = heap ptr
 heap_get_ptr:
 	mov ax, [data.heap]
 	ret
@@ -29,12 +41,24 @@ heap_set_ptr:
 
 
 
-;stack (callee-poped)
+;cdecl args:
+;	void* heap ptr
+c_heap_set_ptr:
+	mov eax, [esp + 4]
+	mov [data.heap], ax
+	o32 ret
+
+
+
+;cdecl args:
 ; uint16_t allocation size
-;return AX = memory ptr
+;return: EAX = memory ptr
+c_linear_alloc:
 linear_alloc:
 	mov ax, [data.heap]
 	add ax, [esp + 4]
 	mov [data.heap], ax
 	sub ax, [esp + 4]
-	ret 2
+	shl eax, 16
+	shr eax, 16
+	o32 ret

@@ -1,5 +1,7 @@
 
 tui enable
-layout asm
-layout regs
+layout split
 focus cmd
+
+display/x { $eax, $ebx, $ecx, $edx, $esi, $edi, $ebp, $esp }
+display/x { $cs, $ds, $ss, $es, $fs, $gs }

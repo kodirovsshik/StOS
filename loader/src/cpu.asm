@@ -5,8 +5,11 @@ extern endl
 
 global check_cpu
 
+
+
 SECTION .text
 BITS 16
+
 
 ;Intel's algorithm
 check_cpu:
@@ -88,15 +91,13 @@ check_cpu:
 
 
 print_cpu_data:
-	push es
+.setup:
 	sub sp, 52
 
-	mov ax, ss
-	mov ds, ax
-	mov es, ax
 	mov di, sp
 	mov si, sp
 
+.get_manufacturer_string:
 	xor eax, eax
 	cpuid
 	mov eax, ebx
@@ -107,14 +108,17 @@ print_cpu_data:
 	stosd
 	mov eax, 10
 	stosd
+.print_manufacturer_string:
 	call puts
 
+.check_brand_string:
 	mov eax, 0x80000000
 	cpuid
 	cmp eax, 0x80000004
 	jb .ret
 
 
+.get_brand_string:
 	mov di, sp
 	mov si, sp
 
@@ -151,14 +155,14 @@ print_cpu_data:
 	xor eax, eax
 	stosd
 
-.unpad: ;why do Intel pad their CPU strings with spaces
+.unpad_brand_string: ;why do Intel pad their CPU strings with spaces
 	mov al, [ds:si]
 	cmp al, ' '
-	jne .print
+	jne .print_brand_string
 	inc si
-	jmp .unpad
+	jmp .unpad_brand_string
 
-.print:
+.print_brand_string:
 	call puts
 	call endl
 
@@ -166,11 +170,11 @@ print_cpu_data:
 	xor ax, ax
 	mov ds, ax
 	add sp, 52
-	pop es
 	ret
 
 
 
+;noreturn
 err_unsupported_cpu:
 	push word 0x200
 	popf

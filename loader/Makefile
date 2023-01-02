@@ -4,16 +4,20 @@ override PBR_SRC := src/pbr.asm
 
 override LOADER_BIN := ../result/loader.bin
 override LOADER_OBJ :=
-override LOADER_OBJ += tmp/a20.asm.elf64
-override LOADER_OBJ += tmp/boot_signature.asm.elf64
-override LOADER_OBJ += tmp/alloc.asm.elf64
-override LOADER_OBJ += tmp/cpu.asm.elf64
-override LOADER_OBJ += tmp/kbio.asm.elf64
-override LOADER_OBJ += tmp/loader.asm.elf64
-override LOADER_OBJ += tmp/memory.asm.elf64
-override LOADER_OBJ += tmp/print.asm.elf64
-override LOADER_OBJ += tmp/time.asm.elf64
-override LOADER_OBJ += tmp/vbe.asm.elf64
+override LOADER_OBJ += tmp/a20.asm.elf
+override LOADER_OBJ += tmp/alloc.asm.elf
+override LOADER_OBJ += tmp/boot_signature.asm.elf
+override LOADER_OBJ += tmp/conio.asm.elf
+override LOADER_OBJ += tmp/cpu.asm.elf
+override LOADER_OBJ += tmp/farptr.asm.elf
+override LOADER_OBJ += tmp/interrupt.asm.elf
+override LOADER_OBJ += tmp/kbio.asm.elf
+override LOADER_OBJ += tmp/loader.asm.elf
+override LOADER_OBJ += tmp/loader.cpp16.elf
+override LOADER_OBJ += tmp/ram.cpp16.elf
+override LOADER_OBJ += tmp/time.asm.elf
+override LOADER_OBJ += tmp/vbe.cpp16.elf
+
 
 all: $(PBR_BIN) $(LOADER_BIN)
 
@@ -26,14 +30,19 @@ $(PBR_BIN): $(PBR_SRC) $(LOADER_BIN)
 	../result/binecho 2049 | dd of=$@_ bs=1 count=8 seek=98 conv=notrunc
 	mv $@_ $@
 
-tmp/%.asm.elf64: src/%.asm
+tmp/%.asm.elf: src/%.asm
 	mkdir -p tmp
-	$(NASM) $< -f elf64 -o $@ -F stabs
+	$(NASM) $< -f elf32 -o $@ -F stabs
+
+tmp/%.cpp16.elf: src/%.cpp
+	mkdir -p tmp
+	$(CXX16) $< -o $@ -mgeneral-regs-only $(CXX_OSIZE) -march=i486 -fno-inline -g
+	#$(OBJCOPY_TARGET) -O elf64-x86-64 $@ $@
 
 $(LOADER_BIN): $(LOADER_OBJ) loader.ld
-	$(LINK_TARGET) $(LOADER_OBJ) -o $@.elf -T loader.ld -Wl,--no-warn-rwx-segment,--build-id=none
+	$(LINKER_FOR_TARGET) $(LOADER_OBJ) -m32 -o $@.elf -T loader.ld -Wl,--no-warn-rwx-segment,--build-id=none
 	$(OBJCOPY_TARGET) $@.elf $@ -O binary
-	ndisasm -o 0x600 $@ > $@.hex
+	ndisasm -o 0x600 $@ > $$(echo $@ | sed s/.bin/_disasm/g)
 
 clean:
-	rm -f *.elf*
+	rm -rf tmp/
