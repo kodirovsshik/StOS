@@ -8,3 +8,8 @@ vm/
 
 #I edit files with nano time to time
 *.swp
+
+#useless
+.vscode/
+.vscode/*
+
