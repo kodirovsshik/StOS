@@ -17,5 +17,13 @@ void swap(T& a, T& b)
 	b = a;
 	a = c;
 }
+template<class T>
+T min(const T& a, const T& b)
+{
+	return b < a ? b : a;
+}
+
+constexpr uint32_t KiB = 1024;
+constexpr uint32_t MiB = 1024 * KiB;
 
 #endif //!_LOADER_H_

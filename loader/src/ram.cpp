@@ -8,9 +8,10 @@ void fill_memory_table();
 void fill_memory_table_fallback();
 void sort_memory_table();
 void print_memory_table();
+void ensure_kernel_load_memory_usable();
 void try_fill_memory_table_e820();
-void try_fill_memory_table_e881(uint32_t& at1m, uint64_t& at16m);
-void try_fill_memory_table_int12(uint32_t&);
+void get_upper_memory_data_e881(uint32_t& at1m, uint64_t& at16m);
+void get_lower_memory_data_int12(uint32_t&);
 [[noreturn]] void error_memory_detection();
 
 
@@ -20,7 +21,7 @@ struct memory_map_entry_t
 	uint32_t type;
 	uint32_t flags;
 };
-static_assert(sizeof(memory_map_entry_t) == 24);
+static_assert(sizeof(memory_map_entry_t) == 24, "");
 
 #define memory_map_addr c_get_memory_map_addr()
 #define memory_map_size c_get_memory_map_size()
@@ -30,14 +31,15 @@ extern "C" uint16_t& c_get_memory_map_size();
 
 
 extern "C"
-void check_memory()
+void do_subtask_memory()
 {
 	fill_memory_table();
 	if (memory_map_size == 0)
 		error_memory_detection();
 	sort_memory_table();
-	//unoverlap()
+	//resolve_memory_table_overlaps();
 	print_memory_table();
+	ensure_kernel_load_memory_usable();
 }
 
 void sort_memory_table()
@@ -76,6 +78,37 @@ void print_memory_table()
 	}
 }
 
+//Ensure memory region [1 MiB; 1 MiB + delta) exists and is available
+void ensure_kernel_load_memory_usable()
+{
+	const uint32_t kernel_minimum_memory = 64 * KiB;
+
+	//To be moved to last available 32-bit address in a region starting at 1 MiB
+	uint32_t low = MiB;
+	const uint32_t high = low + kernel_minimum_memory;
+
+	const auto n = memory_map_size;
+	const auto* table = memory_map_addr;
+	for (uint16_t i = 0; i < n; ++i)
+	{
+		auto& entry = table[i];
+		if (entry.begin > UINT32_MAX)
+			break;
+		if (low >= high)
+			break;
+		if (entry.type != 1)
+			continue;
+		if (low >= entry.begin && low < entry.end)
+			low = (uint32_t)min<uint64_t>(entry.end, UINT32_MAX);
+	}
+	cputs("Available memory at 1 MiB: ");
+	cput32u((low - MiB + 512) / KiB);
+	cputs(" KiB\n");
+	if (low < high)
+		cpanic("Not enough memory available at 1 MiB");
+}
+
+
 void fill_memory_table()
 {
 	try_fill_memory_table_e820();
@@ -87,8 +120,8 @@ void fill_memory_table_fallback()
 	uint32_t memory_at_0;
 	uint32_t memory_at_1m;
 	uint64_t memory_at_16m;
-	try_fill_memory_table_int12(memory_at_0);
-	try_fill_memory_table_e881(memory_at_1m, memory_at_16m);
+	get_lower_memory_data_int12(memory_at_0);
+	get_upper_memory_data_e881(memory_at_1m, memory_at_16m);
 
 	constexpr uint32_t MiB = 1024 * 1024;
 
@@ -147,7 +180,7 @@ void try_fill_memory_table_e820()
 
 	c_heap_set_ptr(memory_map_addr + memory_map_size);
 }
-void try_fill_memory_table_e881(uint32_t& at1m, uint64_t& at16m)
+void get_upper_memory_data_e881(uint32_t& at1m, uint64_t& at16m)
 {
 	regs_t regs{};
 	regs.eax = 0xE881;
@@ -158,6 +191,11 @@ void try_fill_memory_table_e881(uint32_t& at1m, uint64_t& at16m)
 		interrupt(&regs, 0x15);
 		if (regs.flags & EFLAGS_CARRY)
 			return;
+		//Contents of high words is not defined for this interrupt
+		regs.eax = regs.ax;
+		regs.ecx = regs.cx;
+		regs.edx = regs.dx;
+		regs.ebx = regs.bx;
 	}
 	
 	if (regs.ecx != 0)
@@ -169,7 +207,7 @@ void try_fill_memory_table_e881(uint32_t& at1m, uint64_t& at16m)
 	at1m = regs.eax * 1024;
 	at16m = (uint64_t)regs.ebx * 65536;
 }
-void try_fill_memory_table_int12(uint32_t& mem)
+void get_lower_memory_data_int12(uint32_t& mem)
 {
 	regs_t regs{};
 	interrupt(&regs, 0x12);
