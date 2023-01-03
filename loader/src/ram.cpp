@@ -45,18 +45,29 @@ void do_subtask_memory()
 void sort_memory_table()
 {
 	//sorts memory table by ranges' begins
-	//uses selection sort because it is stupidly easy to write
+	//used selection sort because it is stupidly easy to write
+	//now uses insertion sort because it runs in linear
+	//	time when the input data is already sorted
+
 	const auto n = memory_map_size;
 	auto* table = memory_map_addr;
-	for (uint16_t i = 0; i < n; ++i)
+	for (uint16_t i = 1; i < n; ++i)
 	{
-		uint16_t min = i;
-		for (uint16_t j = i + 1; j < n; ++j)
+		uint16_t desired_pos = i;
+		while (desired_pos > 0)
 		{
-			if (table[j].begin < table[min].begin)
-				min = j;
+			if (table[desired_pos - 1].begin <= table[i].begin)
+				break;
+			--desired_pos;
 		}
-		swap(table[i], table[min]);
+		if (desired_pos == i)
+			continue;
+		
+		auto current_elem = table[i];
+		for (uint16_t j = i; j > desired_pos; --j)
+			table[j] = table[j - 1];
+		
+		table[desired_pos] = current_elem;
 	}
 }
 
