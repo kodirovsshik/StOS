@@ -150,3 +150,10 @@ vm-debug16: vm-burn
 #	$(call vm_debug,$(RUN_QEMU32),gdb/init32.gdb)
 #vm-debug64: vm-burn
 #	$(call vm_debug,$(RUN_QEMU64),gdb/init64.gdb)
+
+dev := /dev/sdd
+_:
+	[ x$$(whoami) = xkodirovsshik ]
+	sudo fdisk -l $(dev) | grep -i myusb >/dev/null
+	$(MAKE) vm-burn
+	sudo dd if=$(VM_DISK) of=$(dev) bs=1M count=2
