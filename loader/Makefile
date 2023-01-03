@@ -18,6 +18,11 @@ override LOADER_OBJ += tmp/ram.cpp16.elf
 override LOADER_OBJ += tmp/time.asm.elf
 override LOADER_OBJ += tmp/vbe.cpp16.elf
 
+override GNU_LD_RWX_SEGMENT_WARNING := \
+$$( (echo "SECTIONS{}" | \
+	$(LINKER_FOR_TARGET) /dev/null -T /dev/stdin -nostartfiles -Wl,--no-warn-rwx-segment 2>/dev/null) \
+&& echo ,--no-warn-rwx-segment || echo)
+
 
 all: $(PBR_BIN) $(LOADER_BIN)
 
@@ -36,11 +41,11 @@ tmp/%.asm.elf: src/%.asm
 
 tmp/%.cpp16.elf: src/%.cpp
 	mkdir -p tmp
-	$(CXX16) $< -o $@ -mgeneral-regs-only $(CXX_OSIZE) -march=i486 -fno-inline -g
+	$(CXX16) $< -o $@ -mgeneral-regs-only $(CXX_OSIZE) -march=i486 -Wno-return-type-c-linkage
 	#$(OBJCOPY_TARGET) -O elf64-x86-64 $@ $@
 
 $(LOADER_BIN): $(LOADER_OBJ) loader.ld
-	$(LINKER_FOR_TARGET) $(LOADER_OBJ) -m32 -o $@.elf -T loader.ld -Wl,--no-warn-rwx-segment,--build-id=none
+	$(LINKER_FOR_TARGET) $(LOADER_OBJ) -m32 -o $@.elf -T loader.ld -Wl$(GNU_LD_RWX_SEGMENT_WARNING),--build-id=none
 	$(OBJCOPY_TARGET) $@.elf $@ -O binary
 	ndisasm -o 0x600 $@ > $$(echo $@ | sed s/.bin/_disasm/g)
 
