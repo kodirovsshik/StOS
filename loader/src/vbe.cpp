@@ -51,7 +51,7 @@ struct __attribute__((__packed__)) vbe_info_block
 	char _reserved[222];
 	char _oem_data[256];
 };
-static_assert(sizeof(vbe_info_block) == 512);
+static_assert(sizeof(vbe_info_block) == 512, "");
 
 struct __attribute__((__packed__)) mode_info_block
 {
@@ -128,7 +128,7 @@ struct __attribute__((__packed__)) mode_info_block
 
 	uint8_t reserved_pad[190];
 };
-static_assert(sizeof(mode_info_block) == 256);
+static_assert(sizeof(mode_info_block) == 256, "");
 
 
 
@@ -159,12 +159,9 @@ void get_vbe_information(vbe_info_block& vbe)
 	if (vbe.vbe_version_high < 3)
 		error_no_vbe3_support();
 	
-	cputs(vbe.oem_vendor_name_ptr);
-	cputc('\n');
-	cputs(vbe.oem_product_name_ptr);
-	cputc('\n');
-	cputs(vbe.oem_product_rev_ptr);
-	cputc('\n');
+	cputs(vbe.oem_vendor_name_ptr, endline);
+	cputs(vbe.oem_product_name_ptr, endline);
+	cputs(vbe.oem_product_rev_ptr, endline);
 }
 
 void vbe_print_video_mode_info(const mode_info_block& info)
@@ -235,7 +232,7 @@ void vbe_pick_video_mode()
 }
 
 extern "C"
-void check_vbe()
+void do_subtask_vbe()
 {
 	vbe_info_block vbe;
 	get_vbe_information(vbe);

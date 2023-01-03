@@ -49,7 +49,7 @@ class __attribute__((packed)) FarPtr
 	static_assert(sizeof(T) == 1
 		|| sizeof(T) == 2
 		|| sizeof(T) == 4
-	);
+	, "");
 	uint16_t m_offset;
 	uint16_t m_segment;
 

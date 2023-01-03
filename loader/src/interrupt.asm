@@ -32,6 +32,7 @@ interrupt:
 	mov ebp, [ebp + 24]
 
 	sti
+	clc
 	db 0xCD
 .int_number:
 	db 0x00

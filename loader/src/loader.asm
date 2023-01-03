@@ -5,9 +5,9 @@
 ;✓		Just display some loading message really
 ;✓	Perform CPU discovery
 ;✓		64-bit-capable CPU is required
-;	Check for available memory
+;✓	Check for available memory
 ;✓		Perform memory discovery
-;		Check for region [1 mb; 1mb + X) to be available
+;✓		Check for region [1 mb; 1mb + X) to be available
 ;	Enable A20 pin
 ;✓		BIOS method
 ;		kb controller method
@@ -17,7 +17,7 @@
 ;✓		Use various CMOS data to create signature of boot time
 ;✓		Write it to partition boot record of partition we boot from
 ;✓		Save it for kernel for it to be able to find root partition
-;	Setup reasonable video mode with VBE
+;	Find reasonable video mode with VBE and save it for the kernel
 ;✓		Check for VBE 3.0 support
 ;		Find compliant video modes (Supported, RBG, 24 bit or 32 bit)
 ;		If no found, stop booting
@@ -33,29 +33,34 @@
 ;		Load the kernel at 0x100000
 ;	Setup 64-bit environment
 ;		Identity page mapping for usable memory pages
-;			except for [0x100000; ...) excluded
-;			and instead is mapped at -2GB address:
-;				[0xFFFFFFFF80000000; ...) -> [0x100000; ...),
-;	Go 64 bit
-;	Flex off with some PCI commands
-;		Probe PCI bus for storage devices
-;	Load kernel and transfer the control
+;			except for [0x100000; ...) being excluded
+;			and instead mapped at -2GB address:
+;				[0xFFFFFFFF80000000; ...) -> [0x100000; ...);
+;			and 640KiB starting at 0 being identity-mapped
+;	Flex off with some PCI commands to locate the boot device
+;	Load the kernel at 0x100000
+;	Transfer the control to 64-bit environment
+
 
 ;Assumptions:
 ;	loaded at 0x0000:0x0600
 ;	DL = current BIOS disk number
-;	qword [PBR_LBA_ADDR] = pointer to partition's 8-byte LBA
+;	qword [PBR_LBA_ADDR] = partition's 8-byte LBA
+
 
 ;Memory map:
-;	Segment 0x0000: code & data
+;	Segment 0x0000: loader's code & data
 ;		0x0600: loader
 ;		0x7C00: PBR
 ;	Segment 0x1000: output log buffer
-;
+
+
 ;Conventions:
-;DS = CS = ES = 0, SS = stack segment
-;	except for small places in code where we need otherwise
+;	DS = CS = SS = ES = 0
+;		except for small places in code where other values are needed
+;	DF = 0
 ;
+
 
 %define PBR_LBA_ADDR 0x5F8
 
@@ -77,16 +82,15 @@ global bss.pbr_disk
 global c_get_memory_map_addr
 global c_get_memory_map_size
 
-
 ;functions
 extern put32x
 extern endl
 extern puts
-extern check_cpu
-extern check_memory
-extern check_vbe
-extern activate_a20
-extern create_boot_signature
+extern do_subtask_cpu
+extern do_subtask_memory
+extern do_subtask_a20_line
+extern do_subtask_boot_signature
+extern do_subtask_vbe
 
 ;variables
 extern data.output_use_screen
@@ -103,9 +107,10 @@ rodata:
 	.str_logo db 10, "StOS loader v1.0", 10, 0
 	.str_loader_end db "Error: loader end reached", 0
 	.str_panic db 10, "BOOTLOADER PANIC:", 10, 0
-	.str_ud db 10, "#UD GENERATED, IP = 0x", 0
-	.str_ss db 10, "#SS GENERATED, IP = 0x", 0
-	.str_excp db 10, "UNKNOWN EXCEPTION GENERATED, IP = 0x", 0
+	.str_ud db 10, "#UD", 0
+	.str_ss db 10, "#SS", 0
+	.str_unknown_exception db 10, "UNKNOWN EXCEPTION", 0
+	.str_excp_ip db " GENERATED, IP = 0x", 0
 
 
 
@@ -121,6 +126,8 @@ BITS 16
 loader_begin:
 	jmp loader_main
 
+
+
 align 8, nop
 edata: ;data structure to be read by kernel
 	.pbr_lba dq 0
@@ -129,33 +136,47 @@ edata: ;data structure to be read by kernel
 	.memory_map_addr dd 0
 	.vbe_modes_count dw 0
 	.memory_map_size dw 0
+	.initial_vbe_mode dw 0
+
+
 
 ud_handler:
 	mov si, rodata.str_ud
-	call puts
-	xor eax, eax
-	mov ax, [esp]
-	call put32x
-	mov word [esp], halt
-	iret
+	jmp common_exception_handler
 
 ss_handler:
 	mov si, rodata.str_ss
+	jmp common_exception_handler
+
+unknown_exception_handler:
+	mov si, rodata.str_unknown_exception
+	;jmp common_exception_handler
+
+;si = exception string
+common_exception_handler:
+	call puts ;exception name string
+	
+	mov si, rodata.str_excp_ip ;", IP = "
 	call puts
+
 	xor eax, eax
 	mov ax, [esp]
 	call put32x
-	mov word [esp], halt
+	
+	mov word [esp], halt ;cry about it
 	iret
 
-excp_handler:
-	mov si, rodata.str_excp
-	call puts
-	xor eax, eax
-	mov ax, [esp]
-	call put32x
-	mov word [esp], halt
-	iret
+
+
+setup_exception_handlers:
+	mov eax, unknown_exception_handler
+	mov cx, 7
+	rep stosd
+	mov dword [24], ud_handler
+	mov dword [0xC*4], ss_handler
+	ret
+
+
 
 loader_main:
 	nop
@@ -171,13 +192,6 @@ loader_main:
 	mov ss, ax
 
 	sti
-
-	cld
-	mov eax, excp_handler
-	mov cx, 7
-	rep stosd
-	mov dword [24], ud_handler
-	mov dword [0xC*4], ss_handler
 
 .clear_bss:
 	cld
@@ -203,20 +217,16 @@ loader_main:
 .disable_screen_output:
 	mov byte [data.output_use_screen], 0
 
-.check_cpu:
-	call check_cpu
+.do_subtasks:
+	call do_subtask_cpu
 
-.check_memory:
-	call dword check_memory
+	call dword do_subtask_memory
 
-.a20:
-	call activate_a20
+	call do_subtask_a20_line
 
-.boot_signature:
-	call create_boot_signature
+	call do_subtask_boot_signature
 
-.vbe:
-	call dword check_vbe
+	call dword do_subtask_vbe
 
 
 

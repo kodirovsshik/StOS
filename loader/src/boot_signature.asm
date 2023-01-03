@@ -8,8 +8,8 @@
 
 ;PBR has a boot signature field in it
 ;It is to be written by loader
-;and the PBR is them to be written to disk
-;and found be the kernel
+;and the PBR is then to be written back to disk
+;and found by the kernel
 %define PBR_BOOT_SIG_FIELD_ADDR (0x7C00 + 432)
 
 extern panic
@@ -21,7 +21,7 @@ extern bss.pbr_disk
 extern edata.pbr_lba
 extern edata.boot_signature
 
-global create_boot_signature
+global do_subtask_boot_signature
 
 
 
@@ -48,7 +48,7 @@ SECTION .text
 BITS 16
 
 
-create_boot_signature:
+do_subtask_boot_signature:
 	mov di, PBR_BOOT_SIG_FIELD_ADDR
 	xor bx, bx
 

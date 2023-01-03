@@ -4,16 +4,16 @@
 
 #include <stdint.h>
 
-#define DEFINE_REG(midch, lowch) \
-union\
-{\
-	uint32_t e ## midch ## lowch;\
-	uint16_t midch ## lowch;\
-	struct\
-	{\
-		uint8_t midch ## l;\
-		uint8_t midch ## h;\
-	};\
+#define DEFINE_REG(midch, lowch)		\
+union									\
+{										\
+	uint32_t e ## midch ## lowch;		\
+	uint16_t midch ## lowch;			\
+	struct								\
+	{									\
+		uint8_t midch ## l;				\
+		uint8_t midch ## h;				\
+	};									\
 };
 
 struct regs_t
@@ -27,7 +27,7 @@ struct regs_t
 	DEFINE_REG(bp,);
 	DEFINE_REG(flags,);
 };
-static_assert(sizeof(regs_t) == 32);
+static_assert(sizeof(regs_t) == 32, "");
 
 #undef DEFINE_REG
 

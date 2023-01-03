@@ -3,7 +3,7 @@ extern panic
 extern puts
 extern endl
 
-global check_cpu
+global do_subtask_cpu
 
 
 
@@ -11,9 +11,12 @@ SECTION .text
 BITS 16
 
 
-;Intel's algorithm
-check_cpu:
-	;jmp .check_done
+do_subtask_cpu:
+;Perform CPU discovery with Intel's algorithm
+;The CPU must support long mode
+;If unsuitable CPU is detected, panic and don't return
+
+	;jmp .check_done ;Uncomment to skip CPU discovery
 	cli
 ;Assume at least 8086
 	pushf
@@ -77,20 +80,21 @@ check_cpu:
 	jz err_unsupported_cpu
 
 ;Supported CPU detected, CPU discovery done
-.check_done:
-	shl esp, 16
-	shr esp, 16
-
+.cleanup:
+	;Flags are all messed up by discovery algorithm
 	push dword 0x200
 	popfd ;IF=1
 
-	call print_cpu_data
+.check_done:
+	movzx esp, sp
+	movzx ebp, bp
 
+	call print_cpu_data_strings
 	ret
 
 
 
-print_cpu_data:
+print_cpu_data_strings:
 .setup:
 	sub sp, 52
 
@@ -111,12 +115,11 @@ print_cpu_data:
 .print_manufacturer_string:
 	call puts
 
-.check_brand_string:
+.check_brand_string_present:
 	mov eax, 0x80000000
 	cpuid
 	cmp eax, 0x80000004
 	jb .ret
-
 
 .get_brand_string:
 	mov di, sp
@@ -155,20 +158,17 @@ print_cpu_data:
 	xor eax, eax
 	stosd
 
-.unpad_brand_string: ;why do Intel pad their CPU strings with spaces
-	mov al, [ds:si]
+.unpad_brand_string: ;why do Intel pad their CPU brand strings with spaces
+	lodsb
 	cmp al, ' '
-	jne .print_brand_string
-	inc si
-	jmp .unpad_brand_string
+	je .unpad_brand_string
 
 .print_brand_string:
+	dec si
 	call puts
 	call endl
 
 .ret:
-	xor ax, ax
-	mov ds, ax
 	add sp, 52
 	ret
 

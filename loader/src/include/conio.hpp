@@ -46,5 +46,6 @@ static void cput64x(uint64_t value, uint16_t min_digits = 0)
 	
 
 #define conio _get_conio_params()
+#define endline true
 
 #endif //!_CONIO_HPP_
