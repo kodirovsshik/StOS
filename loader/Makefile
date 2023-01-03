@@ -20,7 +20,7 @@ override LOADER_OBJ += tmp/vbe.cpp16.elf
 
 override GNU_LD_RWX_SEGMENT_WARNING := \
 $$( (echo "SECTIONS{}" | \
-	$(LINKER_FOR_TARGET) /dev/null -T /dev/stdin -nostartfiles -Wl,--no-warn-rwx-segment 2>/dev/null) \
+	$(LINKER_FOR_TARGET) /dev/null -T /dev/stdin -nostartfiles -Wl,--no-warn-rwx-segment 2>/dev/null -o /dev/null) \
 && echo ,--no-warn-rwx-segment || echo)
 
 
