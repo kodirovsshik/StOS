@@ -192,7 +192,7 @@ bool vbe_check_video_mode(const mode_info_block& info)
 	return true;
 }
 
-void get_vbe_video_modes(FarPtr<uint16_t> p_video_modes)
+void save_fitting_vbe_video_modes(FarPtr<uint16_t> p_video_modes)
 {
 	auto p_dst = (uint16_t*)c_heap_get_ptr();
 	vbe_video_modes_ptr = p_dst;
@@ -219,11 +219,6 @@ void get_vbe_video_modes(FarPtr<uint16_t> p_video_modes)
 	}
 	vbe_video_modes_count_usable = p_dst - vbe_video_modes_ptr;
 	c_heap_set_ptr(p_dst);
-
-	cput32u(vbe_video_modes_count_total);
-	cputs(" modes reported, ");
-	cput32u(vbe_video_modes_count_usable);
-	cputs(" modes usable\n");
 }
 
 void vbe_pick_video_mode()
@@ -231,12 +226,21 @@ void vbe_pick_video_mode()
 	//TODO
 }
 
+void print_vbe_video_modes_info()
+{
+	cput32u(vbe_video_modes_count_total);
+	cputs(" modes reported, ");
+	cput32u(vbe_video_modes_count_usable);
+	cputs(" modes usable\n");
+}
+
 extern "C"
 void do_subtask_vbe()
 {
 	vbe_info_block vbe;
 	get_vbe_information(vbe);
-	get_vbe_video_modes(vbe.video_mode_ptr);
+	save_fitting_vbe_video_modes(vbe.video_mode_ptr);
+	print_vbe_video_modes_info();
 	vbe_pick_video_mode();
 }
 
