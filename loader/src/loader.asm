@@ -91,6 +91,7 @@ extern do_subtask_memory
 extern do_subtask_a20_line
 extern do_subtask_boot_signature
 extern do_subtask_vbe
+extern do_pci
 
 ;variables
 extern data.output_use_screen
@@ -220,13 +221,15 @@ loader_main:
 .do_subtasks:
 	call do_subtask_cpu
 
-	call dword do_subtask_memory
+	;call dword do_subtask_memory
 
-	call do_subtask_a20_line
+	;call do_subtask_a20_line
 
-	call do_subtask_boot_signature
+	;call do_subtask_boot_signature
 
-	call dword do_subtask_vbe
+	;call dword do_subtask_vbe
+
+	call dword do_pci
 
 
 

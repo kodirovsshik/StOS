@@ -16,7 +16,7 @@ do_subtask_cpu:
 ;The CPU must support long mode
 ;If unsuitable CPU is detected, panic and don't return
 
-	;jmp .check_done ;Uncomment to skip CPU discovery
+	jmp .check_done ;Uncomment to skip CPU discovery
 	cli
 ;Assume at least 8086
 	pushf
