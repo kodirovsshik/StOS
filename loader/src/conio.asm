@@ -12,10 +12,13 @@ global cputs
 global cput32u
 global cput32x
 global __fill_conio_params
+global save_output_buffer
 
 global data.output_use_screen
 global data.output_use_log
 global data.output_use_serial
+
+extern bss.pbr_disk
 
 
 SECTION .data
@@ -107,13 +110,13 @@ putc1:
 .put_log:
 	cmp al, 13
 	je .put_log.ret
+	mov bx, [data.output_log_ptr]
 	push ds
 	push word 0x1000
 	pop ds
-	mov bx, [data.output_log_ptr]
 	mov [bx], al
-	inc word [data.output_log_ptr]
 	pop ds
+	inc word [data.output_log_ptr]
 
 .put_log.ret:
 	ret
@@ -273,4 +276,30 @@ put32u:
 	push eax
 	call dword cput32u
 	add esp, 8
+	ret
+
+
+
+save_output_buffer:
+	;64 KiB at 0x10000 are written to 128 sectors right before 1 MiB boundary
+	mov bx, [data.output_log_ptr]
+
+	push ds
+	push 0x1000
+	pop ds
+
+	mov byte [bx], 0
+	pop ds
+
+	push dword 0
+	push dword 0x00000780 
+	push dword 0x10000000
+	push dword 0x00800010
+
+	mov si, sp
+	mov dl, [bss.pbr_disk]
+	mov ax, 0x4300
+	int 0x13
+
+	add sp, 16
 	ret

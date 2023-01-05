@@ -91,6 +91,7 @@ extern do_subtask_memory
 extern do_subtask_a20_line
 extern do_subtask_boot_signature
 extern do_subtask_vbe
+extern save_output_buffer
 
 ;variables
 extern data.output_use_screen
@@ -111,6 +112,7 @@ rodata:
 	.str_ss db 10, "#SS", 0
 	.str_unknown_exception db 10, "UNKNOWN EXCEPTION", 0
 	.str_excp_ip db " GENERATED, IP = 0x", 0
+	.str_buffer_saved db 10, 10, "Output buffer dumped to LBA 0x780", 0
 
 
 
@@ -247,17 +249,24 @@ panic:
 
 	pop si
 	call puts
+
 	;jmp halt
 
 ;noreturn
 halt:
+	call save_output_buffer
+
 	mov byte [data.output_use_screen], 1
-	mov si, .str
+
+	mov si, rodata.str_buffer_saved
+	call puts
+
+	mov si, .str_halt
 	call puts
 .x:
 	hlt
 	jmp .x
-.str:
+.str_halt:
 	db 10, "CPU HALTED", 10, 0
 
 

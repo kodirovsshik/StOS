@@ -157,3 +157,6 @@ _:
 	sudo fdisk -l $(dev) | grep -i myusb >/dev/null
 	$(MAKE) vm-burn
 	sudo dd if=$(VM_DISK) of=$(dev) bs=1M count=2
+
+print_serial_port_dump:
+	dd if=$(VM_DISK) bs=512 skip=1920 count=128 2>/dev/null | cat
