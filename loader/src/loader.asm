@@ -106,13 +106,13 @@ extern bss_size_in_words
 SECTION .rodata
 rodata:
 	.str_logo db 10, "StOS loader v1.0", 10, 0
-	.str_loader_end db "Error: loader end reached", 0
+	.str_loader_end db "Error: loader end reached", 10, 0
 	.str_panic db 10, "BOOTLOADER PANIC:", 10, 0
 	.str_ud db 10, "#UD", 0
 	.str_ss db 10, "#SS", 0
 	.str_unknown_exception db 10, "UNKNOWN EXCEPTION", 0
 	.str_excp_ip db " GENERATED, IP = 0x", 0
-	.str_buffer_saved db 10, 10, "Output buffer dumped to LBA 0x780", 0
+	.str_buffer_saved db 10, "Output buffer dumped to LBA 0x780", 0
 
 
 
