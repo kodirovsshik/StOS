@@ -284,20 +284,31 @@ save_output_buffer:
 	;64 KiB at 0x10000 are written to 128 sectors right before 1 MiB boundary
 	mov bx, [data.output_log_ptr]
 
+	;Write terminating zero at the end of the buffer
 	push ds
 	push 0x1000
 	pop ds
-
 	mov byte [bx], 0
 	pop ds
+
+	mov dl, [bss.pbr_disk]
+
+	;IO of 64KiB at once is not supported by some BIOSes' int13 extensions
+	;(Including my development machine with most recent BIOS, for some reason??)
+	;workaround: split write task into 2 chunks of 32KiB
 
 	push dword 0
 	push dword 0x00000780 
 	push dword 0x10000000
-	push dword 0x00800010
-
+	push dword 0x00400010
 	mov si, sp
-	mov dl, [bss.pbr_disk]
+
+	mov ax, 0x4300
+	int 0x13
+
+	add word [esp + 8], 0x40 ;Advance by # of sectors written before
+	add word [esp + 4], 0x8000 ;Advance to the second half of the buffer
+
 	mov ax, 0x4300
 	int 0x13
 
