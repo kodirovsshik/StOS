@@ -8,6 +8,7 @@ override LOADER_OBJ += tmp/a20.asm.elf
 override LOADER_OBJ += tmp/alloc.asm.elf
 override LOADER_OBJ += tmp/conio.asm.elf
 override LOADER_OBJ += tmp/cpu.asm.elf
+override LOADER_OBJ += tmp/debug.asm.elf
 override LOADER_OBJ += tmp/farptr.asm.elf
 override LOADER_OBJ += tmp/interrupt.asm.elf
 override LOADER_OBJ += tmp/kbio.asm.elf

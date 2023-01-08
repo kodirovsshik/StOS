@@ -64,6 +64,7 @@
 
 ;functions
 ;global halt
+global halt
 global panic
 global cpanic
 
@@ -88,6 +89,7 @@ extern do_subtask_memory
 extern do_subtask_a20_line
 extern do_subtask_vbe
 extern save_output_buffer
+extern setup_exception_handlers
 
 ;variables
 extern data.output_use_screen
@@ -104,10 +106,6 @@ rodata:
 	.str_logo db 10, "StOS loader v1.0", 10, 0
 	.str_loader_end db "Error: loader end reached", 10, 0
 	.str_panic db 10, "BOOTLOADER PANIC:", 10, 0
-	.str_ud db 10, "#UD", 0
-	.str_ss db 10, "#SS", 0
-	.str_unknown_exception db 10, "UNKNOWN EXCEPTION", 0
-	.str_excp_ip db " GENERATED, IP = 0x", 0
 	.str_buffer_saved db 10, "Output buffer dumped to LBA 0x780", 0
 
 
@@ -138,44 +136,6 @@ edata: ;data structure to be read by kernel
 
 
 
-ud_handler:
-	mov si, rodata.str_ud
-	jmp common_exception_handler
-
-ss_handler:
-	mov si, rodata.str_ss
-	jmp common_exception_handler
-
-unknown_exception_handler:
-	mov si, rodata.str_unknown_exception
-	;jmp common_exception_handler
-
-;si = exception string
-common_exception_handler:
-	call puts ;exception name string
-	
-	mov si, rodata.str_excp_ip ;", IP = "
-	call puts
-
-	xor eax, eax
-	mov ax, [esp]
-	call put32x
-	
-	mov word [esp], halt ;cry about it
-	iret
-
-
-
-setup_exception_handlers:
-	mov eax, unknown_exception_handler
-	mov cx, 7
-	rep stosd
-	mov dword [24], ud_handler
-	mov dword [0xC*4], ss_handler
-	ret
-
-
-
 loader_main:
 	nop
 
@@ -190,6 +150,8 @@ loader_main:
 	mov ss, ax
 
 	sti
+
+	call setup_exception_handlers
 
 .clear_bss:
 	cld
