@@ -109,8 +109,8 @@ check_a20_slow:
 ;CF=0 otherwise
 check_a20:
 .l1:
-	mov ax, 2
 	push cx
+	mov ax, 2
 	call sleep
 	call _check_a20
 	pop cx

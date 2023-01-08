@@ -119,6 +119,8 @@ bss:
 SECTION .text
 BITS 16
 
+
+
 loader_begin:
 	jmp loader_main
 

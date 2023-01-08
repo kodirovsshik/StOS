@@ -24,5 +24,6 @@ add-symbol-file result/loader.bin.elf
 break loader_main.loader_end
 
 #break loader_main
+#break *0x600
 c
 del bp $bpnum

@@ -183,7 +183,7 @@ void try_fill_memory_table_e820()
 			continue;
 		
 		entry.end += entry.begin;
-		memcpy(memory_map_addr + memory_map_size++, &entry, sizeof(memory_map_entry_t));
+		memory_map_addr[memory_map_size++] = entry;
 
 		if (index == 0)
 			break;

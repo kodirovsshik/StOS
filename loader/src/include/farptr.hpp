@@ -35,9 +35,7 @@ public:
 	operator T() const
 	{
 		uint32_t buff = far_read(this->m_segment, this->m_offset);
-		T result;
-		memcpy(&result, &buff, sizeof(T));
-		return result;
+		return *(T*)&buff;
 	}
 
 	FarPtr<T> operator&() const noexcept;
