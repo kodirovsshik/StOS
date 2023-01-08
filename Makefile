@@ -1,41 +1,49 @@
 
-override DETACHED := >/dev/null 2>&1 & true
+include Makefile.inc
+
+override SILENT := >/dev/null
+override ERR_SILENT := 2>/dev/null
+override DETACHED := $(SILENT) $(ERR_SILENT) & true
+
+override _CXX_ARGS += -Wno-unused-function
+override _NASM_ARGS += -Wall -Werror -Ox -Wno-unknown-warning
+
+#Customization points (compilers for specific targets)
+CXX_FOR_TARGET := x86_64-pc-elf-g++
+CXX64_FOR_TARGET := $(CXX_FOR_TARGET) -m64
+CXX32_FOR_TARGET := $(CXX_FOR_TARGET) -m32
+CXX16_FOR_TARGET := $(CXX_FOR_TARGET) -m16
 
 override CXX_OTIME :=
-override CXX_OSIZE :=
 
 ifeq ($(DEBUG),true)
 override _CXX_ARGS += -Wall -Wextra -Werror -g -Og
 override _NASM_ARGS += -g
 else
 override CXX_OTIME += -Ofast
-override CXX_OSIZE += -Os
 endif
 
-override _CXX_ARGS += -Wno-unused-function
-override _NASM_ARGS += -Wall -Werror -Ox -Wno-unknown-warning
-
-export CXX_OSIZE
 export CXX_OTIME
 
-override export _CXX := $(CXX) $(CXX_OTIME) $(_CXX_ARGS)
+override _CXX_FOR_TARGET_ARGS := -c $(_CXX_ARGS) -ffreestanding -fno-exceptions -fno-rtti
+override _LINKER_FOR_TARGET_ARGS := -nostdlib
 
-CXX_FOR_TARGET := x86_64-pc-elf-g++
-CXX64_FOR_TARGET := $(CXX_FOR_TARGET) -m64
-CXX32_FOR_TARGET := $(CXX_FOR_TARGET) -m32
-CXX16_FOR_TARGET := $(CXX_FOR_TARGET) -m16
-override _CXX_FOR_TARGET_ARGS := -c $(_CXX_ARGS) -ffreestanding -fno-exceptions -fno-rtti 
+#Customization points (args for different compilers)
 override export CXX64 := $(CXX64_FOR_TARGET) $(CXX_FOR_TARGET_ARGS) $(CXX64_FOR_TARGET_ARGS) $(_CXX_FOR_TARGET_ARGS) -mno-red-zone
 override export CXX32 := $(CXX32_FOR_TARGET) $(CXX_FOR_TARGET_ARGS) $(CXX32_FOR_TARGET_ARGS) $(_CXX_FOR_TARGET_ARGS)
 override export CXX16 := $(CXX16_FOR_TARGET) $(CXX_FOR_TARGET_ARGS) $(CXX16_FOR_TARGET_ARGS) $(_CXX_FOR_TARGET_ARGS)
 
-override _LINKER_FOR_TARGET_ARGS := $(LINKER_FOR_TARGET_ARGS) -nostdlib
-override export LINKER_FOR_TARGET := $(CXX_FOR_TARGET) $(_LINKER_FOR_TARGET_ARGS)
+#Customization point (args for linker)
+override export LINKER_FOR_TARGET := $(CXX_FOR_TARGET) $(LINKER_FOR_TARGET_ARGS) $(_LINKER_FOR_TARGET_ARGS)
 
+override export _CXX := $(CXX) $(CXX_OTIME) $(_CXX_ARGS)
+
+#Customization points (custom NASM and args)
 NASM := nasm
 override NASM := $(NASM) $(NASM_ARGS) $(_NASM_ARGS)
 export NASM
 
+#Customization point (custom objcopy)
 export OBJCOPY_TARGET := objcopy
 
 override LAYOUT := result/layout
@@ -44,10 +52,10 @@ override UTILS_SUBDIRS := binecho
 override SRC_SUBDIRS := mbr loader
 override SUBDIRS := $(UTILS_SUBDIRS) $(SRC_SUBDIRS) 
 
+#Customization points (vm settings)
 VM_DIR := vm
 VM_DISK := $(VM_DIR)/disk.bin
 VM_DISK_SIZE_MiB := 8
-
 VM_MEMORY_MiB := 64
 
 override _QEMU_ARGS := \
@@ -55,12 +63,13 @@ override _QEMU_ARGS := \
 	-m $(VM_MEMORY_MiB) \
 	-drive file="$(VM_DISK)",format=raw \
 
+#Customization points
 QEMU32 := qemu-system-i386
 QEMU32_CPU := 486
-override RUN_QEMU32 := $(QEMU32) $(_QEMU_ARGS) $(QEMU32_ARGS) -cpu $(QEMU32_CPU)
-
 QEMU64 := qemu-system-x86_64
 QEMU64_CPU := 486,+lm,+pae
+
+override RUN_QEMU32 := $(QEMU32) $(_QEMU_ARGS) $(QEMU32_ARGS) -cpu $(QEMU32_CPU)
 override RUN_QEMU64 := $(QEMU64) $(_QEMU_ARGS) $(QEMU64_ARGS) -cpu $(QEMU64_CPU)
 
 override export MiB := 1048576
@@ -114,9 +123,9 @@ $(VM_DISK):
 
 define write_boot_record
 	[ $$(stat -c "%s" "$(1)") -eq 512 ]
-	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$(3) count=3
-	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$$(($(3)+90)) skip=90 count=350
-	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$$(($(3)+510)) skip=510 count=2
+	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$(3) count=3 $(ERR_SILENT)
+	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$$(($(3)+90)) skip=90 count=350 $(ERR_SILENT)
+	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$$(($(3)+510)) skip=510 count=2 $(ERR_SILENT)
 endef
 
 define write_image
@@ -151,8 +160,11 @@ vm-debug16: vm-burn
 #vm-debug64: vm-burn
 #	$(call vm_debug,$(RUN_QEMU64),gdb/init64.gdb)
 
+#burns $(VM_DISK) to my USB stick $(dev)
+#for ease of testing on real hardware
 dev := /dev/sdd
 _:
+#	It would suck to wipe someone's MBR by accident
 	[ x$$(whoami) = xkodirovsshik ]
 	sudo fdisk -l $(dev) | grep -i myusb >/dev/null
 	$(MAKE) vm-burn
