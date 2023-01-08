@@ -13,16 +13,13 @@
 ;		kb controller method
 ;✓		port ee method
 ;✓		port 92 method
-;✓	Calculate boot signature
-;✓		Use various CMOS data to create signature of boot time
-;✓		Write it to partition boot record of partition we boot from
-;✓		Save it for kernel for it to be able to find root partition
 ;	Find reasonable video mode with VBE and save it for the kernel
 ;✓		Check for VBE 3.0 support
 ;		Find compliant video modes (Supported, RBG, 24 bit or 32 bit)
 ;		If no found, stop booting
 ;		Pick largest video mode not exceeding 768 in height
 ;		If no found, pick the one with smallest height
+;✓	Read disk UUID
 ;	Setup protected mode environment
 ;		Basic temporary GDT with 32-bit code and data segments
 ;
@@ -89,7 +86,6 @@ extern puts
 extern do_subtask_cpu
 extern do_subtask_memory
 extern do_subtask_a20_line
-extern do_subtask_boot_signature
 extern do_subtask_vbe
 extern save_output_buffer
 
@@ -132,8 +128,8 @@ loader_begin:
 
 align 8, nop
 edata: ;data structure to be read by kernel
-	.pbr_lba dq 0
-	.boot_signature dq 0
+	.boot_disk_uuid times 16 db 0
+	.boot_partition_lba dq 0
 	.vbe_modes_ptr dd 0
 	.memory_map_addr dd 0
 	.vbe_modes_count dw 0
@@ -206,7 +202,7 @@ loader_main:
 	mov [bss.pbr_disk], dl
 
 	mov si, PBR_LBA_ADDR
-	mov di, edata.pbr_lba
+	mov di, edata.boot_partition_lba
 	times 4 movsw
 
 .logo:
@@ -226,9 +222,9 @@ loader_main:
 
 	call do_subtask_a20_line
 
-	call do_subtask_boot_signature
-
 	call dword do_subtask_vbe
+
+	call do_subtask_disk_uuid
 
 
 
@@ -288,3 +284,18 @@ c_get_memory_map_size:
 cpanic:
 	mov si, [esp + 4]
 	jmp panic
+
+
+
+do_subtask_disk_uuid:
+	times 2 push dword 0
+	push dword loader_end
+	push dword 0x00010010
+	mov si, sp
+	mov ah, 0x42
+	mov dl, [bss.pbr_disk]
+	int 0x13
+	mov eax, [loader_end + 512 - 2 - 64 - 6]
+	mov [edata.boot_disk_uuid], eax
+	add sp, 16
+	ret

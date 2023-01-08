@@ -29,7 +29,7 @@ SECTIONS
     *(.bss)
   }
   
-  . = ALIGN(4);
+  . = ALIGN(8);
   PROVIDE(loader_end = .);
   PROVIDE(bss_size_in_words = (. - bss_begin) / 2);
 

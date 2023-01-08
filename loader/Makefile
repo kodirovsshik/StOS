@@ -6,7 +6,6 @@ override LOADER_BIN := ../result/loader.bin
 override LOADER_OBJ :=
 override LOADER_OBJ += tmp/a20.asm.elf
 override LOADER_OBJ += tmp/alloc.asm.elf
-override LOADER_OBJ += tmp/boot_signature.asm.elf
 override LOADER_OBJ += tmp/conio.asm.elf
 override LOADER_OBJ += tmp/cpu.asm.elf
 override LOADER_OBJ += tmp/farptr.asm.elf
