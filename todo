@@ -1,6 +1,1 @@
 Implement A20 enable via keyboard controller
-
-Generalize pbr's loader begin field to be written 
-during installation and not build
-
-stdout buffer to device flush function

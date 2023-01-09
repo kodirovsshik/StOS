@@ -7,7 +7,7 @@ entry:
 	nop
 
 %if $ - entry != 3
-%error Invalid jump signature
+%error Invalid jump sequence
 %endif
 
 bpb:
@@ -16,9 +16,9 @@ bpb:
 lba:
 .sz: db 16
 db 0
-.loader_size: dw 0 ;offset 92
+.loader_size: dw 0 ;offset 92, size 2
 dd 0x00000600
-.loader_sector: dq 0 ;offset 98
+.loader_sector: dq 0 ;offset 98, size 8
 
 start:
 	cli

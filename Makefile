@@ -49,7 +49,7 @@ export OBJCOPY_TARGET := objcopy
 override LAYOUT := result/layout
 
 override UTILS_SUBDIRS := binecho
-override SRC_SUBDIRS := mbr loader
+override SRC_SUBDIRS := mbr pbr loader
 override SUBDIRS := $(UTILS_SUBDIRS) $(SRC_SUBDIRS) 
 
 #Customization points (vm settings)
@@ -133,6 +133,11 @@ define write_image
 endef
 
 vm-burn: $(VM_DISK) all
+	set -e ;\
+	LOADER_SIZE=$$(stat -c "%s" result/loader.bin) ;\
+	LOADER_SECTORS=$$((($$LOADER_SIZE + 511) / 512)) ;\
+	result/binecho $$LOADER_SECTORS | (dd of=result/pbr.bin bs=1 count=2 seek=92 conv=notrunc 2>/dev/null)
+	result/binecho 2049 | (dd of=result/pbr.bin bs=1 count=8 seek=98 conv=notrunc 2>/dev/null)
 	$(call write_boot_record,result/mbr.bin,"$(VM_DISK)",0)
 	$(call write_boot_record,result/pbr.bin,"$(VM_DISK)",$(MiB))
 	$(call write_image,result/loader.bin,"$(VM_DISK)",$$(($(MiB)+512)))
