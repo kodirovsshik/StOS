@@ -1,5 +1,5 @@
 
-#OUTPUT_FORMAT(elf32-i386)
+OUTPUT_FORMAT(elf32-i386)
 OUTPUT_ARCH(i386)
 
 SECTIONS 
@@ -9,16 +9,16 @@ SECTIONS
   . = loader_begin;
 	.text :
 	{
-		tmp/loader.asm.elf(.text)
-		*(.text)
+		tmp/loader.elf16(.text)
+    *(.text*)
 	}
   .data :
   {
-    *(.data)
+    *(.data*)
   }
   .rodata :
   {
-    *(.rodata)
+    *(.rodata*)
   }
 
   . = ALIGN(8);
@@ -26,7 +26,7 @@ SECTIONS
   PROVIDE(bss_begin = .);
   .bss :
   {
-    *(.bss)
+    *(.bss*)
   }
   
   . = ALIGN(8);

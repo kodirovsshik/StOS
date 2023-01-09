@@ -90,6 +90,7 @@ extern do_subtask_a20_line
 extern do_subtask_vbe
 extern save_output_buffer
 extern setup_exception_handlers
+extern go_pm
 
 ;variables
 extern data.output_use_screen
@@ -189,6 +190,8 @@ loader_main:
 	call dword do_subtask_vbe
 
 	call do_subtask_disk_uuid
+
+	call dword go_pm
 
 
 
