@@ -15,6 +15,9 @@ rodata:
 	.str_a20_try_ee: db "Trying A20 via port 0xEE", 10, 0
 	.str_a20_try_92: db "Trying A20 via port 0x92", 10, 0
 	.str_a20_done: db "A20 is enabled", 10, 0
+
+
+	
 SECTION .text
 BITS 16
 

@@ -55,8 +55,8 @@ override SUBDIRS := $(UTILS_SUBDIRS) $(SRC_SUBDIRS)
 #Customization points (vm settings)
 VM_DIR := vm
 VM_DISK := $(VM_DIR)/disk.bin
-VM_DISK_SIZE_MiB := 8
-VM_MEMORY_MiB := 64
+VM_DISK_SIZE_MiB := 2
+VM_MEMORY_MiB := 32
 
 override _QEMU_ARGS := \
 	$(QEMU_ARGS) \
@@ -92,8 +92,7 @@ clean:
 	rm -rf result
 	for dir in $(SUBDIRS); do $(MAKE) -C $$dir clean; done
 
-reset: clean vm-clean
-wipe: reset
+wipe: clean vm-clean
 
 $(SUBDIRS): $(LAYOUT)
 	$(MAKE) -C $@
@@ -112,7 +111,6 @@ vm-clean:
 vm-recreate: vm-clean
 	$(MAKE) vm-create
 
-
 $(VM_DISK):
 	mkdir -p $(VM_DIR)
 	dd if=/dev/zero of=$@ bs=1M count=$(VM_DISK_SIZE_MiB)
@@ -120,6 +118,7 @@ $(VM_DISK):
 # ^^^ I hate myself for writing this ^^^
 #but it keeps -e in the output for some reason if i don't wrap it with bash -c
 	sfdisk -A $@ 1
+
 
 define write_boot_record
 	[ $$(stat -c "%s" "$(1)") -eq 512 ]
@@ -142,11 +141,12 @@ vm-burn: $(VM_DISK) all
 	$(call write_boot_record,result/pbr.bin,"$(VM_DISK)",$(MiB))
 	$(call write_image,result/loader.bin,"$(VM_DISK)",$$(($(MiB)+512)))
 
+
 vm-run32: vm-burn
 	$(RUN_QEMU32)
 vm-run64: vm-burn
 	$(RUN_QEMU64)
-vm-run-kvm: vm-burn
+vm-run: vm-burn
 	$(RUN_QEMU64) -cpu host --enable-kvm
 
 define vm_debug
