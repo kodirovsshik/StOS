@@ -25,7 +25,7 @@ extern "C" void* memcpy(void* dst, const void* src, size_t bytes)
 
 extern "C" void* memset(void* dst, uint8_t val, size_t bytes)
 {
-	const uint64_t val64 = 0x0101010101010101 * val;
+	const uint64_t val64 = 0x0101010101010101u * val;
 	
 	auto p64dst = (uint64_t*)dst;
 	while (bytes >= 8)
@@ -75,4 +75,18 @@ extern "C" void* memset(void* dst, uint8_t val, size_t bytes)
 	static_assert(sizeof(uint64_t) == 8, "");
 	static_assert(sizeof(uint32_t) == 4, "");
 	static_assert(uint32_t(-1) > 0, "");
+
+	/*
+	Sanitizers come to help. The issue was that 0x01010101 * val is undefined
+	for val >= 128 due to signed integer overflow
+	So why again have I always thought all constants defined with 0x were unsigned?
+
+	Still, I don't understang GCC's motivation of doing low = val32 + ((int32)val32 >> 31)
+	(Especially since (int32)val32 >> 31 should always be 0 in its head, because the
+	compiler assumes that no UB (that is, no signed integer overflow) will ever occur)
+	Honestly, it looks more like GCC has purposely tried to screw things up in case
+	overflow happens, which I would still not be happy about
+
+	Personal conclusion: use clang and sanitizers
+	*/
 }

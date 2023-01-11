@@ -13,16 +13,16 @@ define nc32
 	nskip 6
 end
 
-set disassembly-flavor intel
-set tdesc filename gdb/target32.xml
+set tdesc filename gdb/target16.xml
 set architecture i8086
 
 target remote localhost:1234
 
-add-symbol-file result/loader.bin.elf
+add-symbol-file result/loader.elf
 
 break loader_main.loader_end
 
+break go_pm
 #break loader_main
 #break *0x600
 c
