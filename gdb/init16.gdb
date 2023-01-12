@@ -19,11 +19,12 @@ set architecture i8086
 target remote localhost:1234
 
 add-symbol-file result/loader.elf
+add-symbol-file result/kernel.elf
 
 break loader_main.loader_end
 
-break go_pm
+break pm_main
 #break loader_main
-#break *0x600
+break *0x600
 c
 del bp $bpnum
