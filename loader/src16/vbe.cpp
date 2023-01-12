@@ -133,7 +133,10 @@ static_assert(sizeof(mode_info_block) == 256, "");
 
 
 [[noreturn]]
-void error_no_vbe3_support();
+void error_no_vbe3_support()
+{
+	cpanic("VBE 3.0 support required");
+}
 
 
 void get_vbe_information(vbe_info_block& vbe)
@@ -166,6 +169,7 @@ void get_vbe_information(vbe_info_block& vbe)
 
 void vbe_print_video_mode_info(const mode_info_block& info)
 {
+#ifdef _DEBUG
 	cputc("US"[info.attrib_supported]);
 	cputc("tT"[info.attrib_bios_tty_supported]);
 	cputc("MC"[info.attrib_color]); // monochrome/color
@@ -183,6 +187,7 @@ void vbe_print_video_mode_info(const mode_info_block& info)
 
 	cput32u(info.memory_model);
 	cputc('\n');
+#endif
 }
 
 bool vbe_check_video_mode(const mode_info_block& info)
@@ -242,10 +247,4 @@ void do_subtask_vbe()
 	save_fitting_vbe_video_modes(vbe.video_mode_ptr);
 	print_vbe_video_modes_info();
 	vbe_pick_video_mode();
-}
-
-[[noreturn]]
-void error_no_vbe3_support()
-{
-	cpanic("VBE 3.0 support required");
 }

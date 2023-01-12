@@ -35,7 +35,7 @@ all:
 	$(MAKE) $(LOADER_BIN)
 
 tmp/%.asm.elf: src*/%.asm
-	$(NASM) $< -f elf32 -o $@ -F stabs
+	$(NASM) $< -f elf32 -o $@ -F dwarf
 
 tmp/%.cpp16.elf: src*/%.cpp
 	$(CXX16) $< -o $@ $(call get_osize,$(CXX16)) $(LOADER_CXX_ARGS)
@@ -55,6 +55,7 @@ $(LOADER_ELF32): $(LOADER_OBJ32)
 $(LOADER_BIN): $(LOADER_ELF16) $(LOADER_ELF32) loader.ld
 	$(LINKER_FOR_TARGET) $(LOADER_ELF16) $(LOADER_ELF32) -o $(LOADER_ELF) -T loader.ld -Wl$(GNU_LD_RWX_SEGMENT_WARNING),--build-id=none
 	$(OBJCOPY_TARGET) $(LOADER_ELF) $@ -O binary
+	chmod a-x $@ $(LOADER_ELF)
 	ndisasm -o 0x600 $@ > $(LOADER_DISASM)
 
 clean:
