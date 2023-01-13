@@ -1,7 +1,6 @@
 
 tui enable
-#layout split
-layout asm
+layout src
 layout regs
 focus cmd
 

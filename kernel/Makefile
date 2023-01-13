@@ -18,7 +18,7 @@ $(KERNEL_LAYOUT):
 	$(call replicate_directory_structure,$(KERNEL_SRC),$(KERNEL_TMP))
 
 $(KERNEL_TMP)/%.asm.elf: $(KERNEL_SRC)/%.asm | $(KERNEL_LAYOUT)
-	$(NASM) $< -f elf64 -o $@ -F dwarf
+	$(NASMD) $< -f elf64 -o $@
 
 $(KERNEL_TMP)/%.cpp64.elf: $(KERNEL_SRC)/%.cpp | $(KERNEL_LAYOUT)
 	$(CXX64) $< -o $@ $(KERNEL_CXX_ARGS)

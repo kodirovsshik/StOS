@@ -40,7 +40,7 @@ $(LOADER_LAYOUT):
 	$(call replicate_directory_structure,$(LOADER_SRC32),$(LOADER_TMP))
 
 $(LOADER_TMP)/%.asm.elf: $(LOADER_DIR)/src*/%.asm | $(LOADER_LAYOUT)
-	$(NASM) $< -f elf32 -o $@ -F dwarf
+	$(NASMD) $< -f elf32 -o $@
 
 $(LOADER_TMP)/%.cpp16.elf: $(LOADER_SRC16)/%.cpp | $(LOADER_LAYOUT)
 	$(CXX16) $< -o $@ $(call get_osize,$(CXX16)) $(LOADER_CXX_ARGS)

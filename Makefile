@@ -52,7 +52,7 @@ override CXX_OTIME :=
 
 ifeq ($(DEBUG),true)
 override _CXX_ARGS += -Wall -Wextra -Werror -g -Og -D_DEBUG
-override _NASM_ARGS += -g -D_DEBUG
+override _NASM_ARGS += -D_DEBUG
 else
 override _CXX_ARGS += -DNDEBUG
 override _NASM_ARGS += -DNDEBUG
@@ -75,7 +75,11 @@ override export _CXX := $(CXX) $(CXX_OTIME) $(_CXX_ARGS)
 #Customization points (custom NASM and args)
 NASM := nasm
 override NASM := $(NASM) $(NASM_ARGS) $(_NASM_ARGS)
-export NASM
+ifeq ($(DEBUG),true)
+override NASMD := $(NASM) -gdwarf
+else
+override NASMD := $(NASM)
+endif
 
 #Customization point (custom objcopy)
 export OBJCOPY_TARGET := objcopy
@@ -143,7 +147,7 @@ override BINARIES :=
 override BINARIES_DIRS :=
 
 
-#Customization point
+#Customization point (output binary name)
 PBR_BIN_NAME := pbr.bin
 override PBR_DIR := pbr
 override PBR_BIN := $(PBR_DIR)/$(PBR_BIN_NAME)
@@ -152,7 +156,7 @@ override BINARIES += $(PBR_BIN)
 include $(PBR_DIR)/Makefile
 
 
-#Customization point
+#Customization point (output binary name)
 MBR_BIN_NAME := mbr.bin
 override MBR_DIR := mbr
 override MBR_BIN := $(MBR_DIR)/$(MBR_BIN_NAME)
@@ -161,7 +165,7 @@ override BINARIES += $(MBR_BIN)
 include $(MBR_DIR)/Makefile
 
 
-#Customization point
+#Customization point (output binary name)
 LOADER_BIN_NAME := loader.bin
 override LOADER_DIR := loader
 override LOADER_BIN := $(LOADER_DIR)/$(LOADER_BIN_NAME)
@@ -173,7 +177,7 @@ override LOADER_SIZE = $(shell stat -c "%s" $(LOADER_BIN))
 override LOADER_SECTORS = $(shell expr \( $(LOADER_SIZE) + 511 \) / 512 )
 
 
-#Customization point
+#Customization point (output binary name)
 KERNEL_BIN_NAME := kernel.bin
 override KERNEL_DIR := kernel
 override KERNEL_BIN := $(KERNEL_DIR)/$(KERNEL_BIN_NAME)
