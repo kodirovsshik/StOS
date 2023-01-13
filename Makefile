@@ -28,7 +28,6 @@ endef
 #Invoke as follows: replicate_directory_structure SRC DST
 #Replicates structure of SRC inside DST
 define replicate_directory_structure
-	mkdir -p $(2)
 	cd $(1) ;\
 	find . -type d -exec mkdir -p -- "$(shell pwd)/$(2)/{}" \;
 endef

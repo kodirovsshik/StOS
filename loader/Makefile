@@ -35,6 +35,7 @@ override LOADER_CXX_ARGS := \
 
 
 $(LOADER_LAYOUT):
+	mkdir -p $(LOADER_TMP)
 	$(call replicate_directory_structure,$(LOADER_SRC16),$(LOADER_TMP))
 	$(call replicate_directory_structure,$(LOADER_SRC32),$(LOADER_TMP))
 

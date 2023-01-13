@@ -14,7 +14,7 @@ override KERNEL_LAYOUT := $(KERNEL_TMP)
 
 
 $(KERNEL_LAYOUT):
-	mkdir $(KERNEL_TMP)
+	mkdir -p $(KERNEL_TMP)
 	$(call replicate_directory_structure,$(KERNEL_SRC),$(KERNEL_TMP))
 
 $(KERNEL_TMP)/%.asm.elf: $(KERNEL_SRC)/%.asm | $(KERNEL_LAYOUT)
