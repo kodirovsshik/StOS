@@ -1,12 +1,47 @@
 
-include Makefile.inc
+#Clang (and apparently GCC starting with 13.0) have aggressive size optimization option -Oz
+ifeq ($(DEBUG),true)
+define get_osize
+$(shell echo)
+endef
+else
+define get_osize
+$(shell ($(1) -xc /dev/null -c -Oz 2>/dev/null -o /dev/zero) \
+	&& echo -Oz || echo -Os)
+endef
+endif
+
+
+#Invoke as follows: find_objs_names (src excention) (appendix) (src dir) (tmp dir)
+#Finds all files with extention (src excention) in (src dir)
+#Returns list of files of the form (tmp dir)/filename(appendix)
+define find_objs_names
+$(patsubst \
+$(3)/%.$(1),\
+$(4)/%.$(1)$(2),\
+$(shell find $(3) -type f -name \*.$(1))\
+)
+endef
+
+
+
+#Invoke as follows: replicate_directory_structure SRC DST
+#Replicates structure of SRC inside DST
+define replicate_directory_structure
+	mkdir -p $(2)
+	cd $(1) ;\
+	find . -type d -exec mkdir -p -- "$(shell pwd)/$(2)/{}" \;
+endef
+#why does find require a semicolon at the end wtf
+
+
 
 override SILENT := >/dev/null
-override ERR_SILENT := 2>/dev/null
-override DETACHED := $(SILENT) $(ERR_SILENT) & true
+override ESILENT := 2>/dev/null
+override DETACHED := $(SILENT) $(ESILENT) & true
 
 override _CXX_ARGS += -Wno-unused-function
-override _NASM_ARGS += -Wall -Werror -Ox -Wno-unknown-warning
+override _NASM_ARGS += -Wall -Werror -Wno-unknown-warning -Ox
 
 #Customization points (compilers for specific targets)
 CXX_FOR_TARGET := x86_64-pc-elf-g++
@@ -17,13 +52,13 @@ CXX16_FOR_TARGET := $(CXX_FOR_TARGET) -m16
 override CXX_OTIME :=
 
 ifeq ($(DEBUG),true)
-override _CXX_ARGS += -Wall -Wextra -Werror -g -Og
-override _NASM_ARGS += -g
+override _CXX_ARGS += -Wall -Wextra -Werror -g -Og -D_DEBUG
+override _NASM_ARGS += -g -D_DEBUG
 else
+override _CXX_ARGS += -DNDEBUG
+override _NASM_ARGS += -DNDEBUG
 override CXX_OTIME += -Ofast
 endif
-
-export CXX_OTIME
 
 override _CXX_FOR_TARGET_ARGS := -c $(_CXX_ARGS) -ffreestanding -fno-exceptions -fno-rtti
 override _LINKER_FOR_TARGET_ARGS := -nostdlib
@@ -46,17 +81,15 @@ export NASM
 #Customization point (custom objcopy)
 export OBJCOPY_TARGET := objcopy
 
-override LAYOUT := result/layout
-
-override UTILS_SUBDIRS := binecho
-override SRC_SUBDIRS := mbr pbr loader
-override SUBDIRS := $(UTILS_SUBDIRS) $(SRC_SUBDIRS) 
 
 #Customization points (vm settings)
 VM_DIR := vm
 VM_DISK := $(VM_DIR)/disk.bin
 VM_DISK_SIZE_MiB := 2
 VM_MEMORY_MiB := 32
+
+override VM_MNT := $(VM_DIR)/mnt
+override LOOPDEV = $(shell losetup --show -f $(VM_DISK) -o 1MiB)
 
 override _QEMU_ARGS := \
 	$(QEMU_ARGS) \
@@ -76,34 +109,114 @@ override export MiB := 1048576
 
 
 
+.PHONY: all
+all: binaries
+#target 'binaries' will have all the necessary dependencies known after all includes
 
-.PHONY: all $(SUBDIRS) rebuild clean reset wipe
-.PHONY: vm-create vm-clean vm-recreate vm-burn vm-run32 vm-debug32
+
+override UTILS :=
+override UTILS_DIRS :=
 
 
-all: $(SUBDIRS)
+#Customization point (output binary name)
+BINECHO_BIN_NAME := binecho.elf
+override BINECHO_DIR := binecho
+override BINECHO_BIN := $(BINECHO_DIR)/$(BINECHO_BIN_NAME)
+override BINECHO := $(BINECHO_BIN)
+override UTILS_DIRS += $(BINECHO_DIR)
+override UTILS += $(BINECHO_BIN)
+include $(BINECHO_DIR)/Makefile
 
-$(SRC_SUBDIRS): $(UTILS_SUBDIRS)
 
-rebuild: clean
-	$(MAKE)
+#Customization point (output binary name)
+VM_PREPARATOR_BIN_NAME := vm_preparator.elf
+override VM_PREPARATOR_DIR := vm_preparator
+override VM_PREPARATOR_BIN := $(VM_PREPARATOR_DIR)/$(VM_PREPARATOR_BIN_NAME)
+override VM_PREPARATOR := $(VM_PREPARATOR_BIN)
+override UTILS_DIRS += $(VM_PREPARATOR_DIR)
+override UTILS += $(VM_PREPARATOR_BIN)
+include $(VM_PREPARATOR_DIR)/Makefile
 
-clean:
-	rm -rf result
-	for dir in $(SUBDIRS); do $(MAKE) -C $$dir clean; done
+
+
+
+override BINARIES :=
+override BINARIES_DIRS :=
+
+
+#Customization point
+PBR_BIN_NAME := pbr.bin
+override PBR_DIR := pbr
+override PBR_BIN := $(PBR_DIR)/$(PBR_BIN_NAME)
+override BINARIES_DIRS += $(PBR_DIR)
+override BINARIES += $(PBR_BIN)
+include $(PBR_DIR)/Makefile
+
+
+#Customization point
+MBR_BIN_NAME := mbr.bin
+override MBR_DIR := mbr
+override MBR_BIN := $(MBR_DIR)/$(MBR_BIN_NAME)
+override BINARIES_DIRS += $(MBR_DIR)
+override BINARIES += $(MBR_BIN)
+include $(MBR_DIR)/Makefile
+
+
+#Customization point
+LOADER_BIN_NAME := loader.bin
+override LOADER_DIR := loader
+override LOADER_BIN := $(LOADER_DIR)/$(LOADER_BIN_NAME)
+override BINARIES_DIRS += $(LOADER_DIR)
+override BINARIES += $(LOADER_BIN)
+include $(LOADER_DIR)/Makefile
+
+override LOADER_SIZE = $(shell stat -c "%s" $(LOADER_BIN))
+override LOADER_SECTORS = $(shell expr \( $(LOADER_SIZE) + 511 \) / 512 )
+
+
+#Customization point
+KERNEL_BIN_NAME := kernel.bin
+override KERNEL_DIR := kernel
+override KERNEL_BIN := $(KERNEL_DIR)/$(KERNEL_BIN_NAME)
+override BINARIES_DIRS += $(KERNEL_DIR)
+override BINARIES += $(KERNEL_BIN)
+include $(KERNEL_DIR)/Makefile
+
+
+
+override SUBDIRS := $(UTILS_DIRS) $(BINARIES_DIRS) 
+
+
+
+
+
+.PHONY: binaries utils everything
+
+binaries: $(BINARIES)
+utils: $(UTILS)
+everything: binaries utils
+
+
+
+.PHONY: clean clean-binaries clean-utils wipe
+
+clean-binaries: $(patsubst %,clean-sub-%,$(BINARIES_DIRS))
+
+clean-utils: $(patsubst %,clean-sub-%,$(UTILS_DIRS))
+
+clean: clean-binaries clean-utils
 
 wipe: clean vm-clean
 
-$(SUBDIRS): $(LAYOUT)
-	$(MAKE) -C $@
-
-$(LAYOUT):
-	mkdir -p result result/utils
-	touch $@
 
 
 
-vm-create: $(VM_DISK)
+.PHONY: vm-create vm-clean vm-recreate vm-burn vm-run vm-debug16
+
+
+vm-create:
+	mkdir -p $(VM_MNT)
+	dd if=/dev/zero of=$(VM_DISK) bs=1M count=$(VM_DISK_SIZE_MiB)
 
 vm-clean:
 	rm -rf $(VM_DIR)
@@ -111,35 +224,39 @@ vm-clean:
 vm-recreate: vm-clean
 	$(MAKE) vm-create
 
-$(VM_DISK):
-	mkdir -p $(VM_DIR)
-	dd if=/dev/zero of=$@ bs=1M count=$(VM_DISK_SIZE_MiB)
-	bash -c "echo -e 1M,\\\\nwrite | sfdisk $@" >/dev/null
+vm-burn: $(VM_DISK)
+
+$(VM_DISK): $(BINARIES) $(UTILS)
+	$(MAKE) vm-recreate
+	bash -c "echo -e 1M,\\\\nwrite | sfdisk $(VM_DISK)" >/dev/null
 # ^^^ I hate myself for writing this ^^^
 #but it keeps -e in the output for some reason if i don't wrap it with bash -c
-	sfdisk -A $@ 1
+	sfdisk --part-type $(VM_DISK) 1 0c $(SILENT)
+
+	sudo $(VM_PREPARATOR) $(VM_DISK) $(VM_MNT) $(KERNEL_BIN)
+
+	$(BINECHO) $(LOADER_SECTORS) | (dd of=$(PBR_BIN) bs=1 count=2 seek=92 conv=notrunc $(ESILENT))
+	$(BINECHO) 2049 | (dd of=$(PBR_BIN) bs=1 count=8 seek=98 conv=notrunc $(ESILENT))
+
+	$(call write_boot_record,$(MBR_BIN),"$(VM_DISK)",0)
+	$(call write_boot_record,$(PBR_BIN),"$(VM_DISK)",$(MiB))
+	$(call write_image,$(LOADER_BIN),"$(VM_DISK)",$$(($(MiB)+512)))
+	sfdisk -A $(VM_DISK) 1
+	
 
 
 define write_boot_record
 	[ $$(stat -c "%s" "$(1)") -eq 512 ]
-	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$(3) count=3 $(ERR_SILENT)
-	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$$(($(3)+90)) skip=90 count=350 $(ERR_SILENT)
-	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$$(($(3)+510)) skip=510 count=2 $(ERR_SILENT)
+	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$(3) count=3 $(ESILENT)
+	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$$(($(3)+90)) skip=90 count=350 $(ESILENT)
+	dd if=$(1) of=$(2) bs=1 conv=notrunc seek=$$(($(3)+510)) skip=510 count=2 $(ESILENT)
 endef
 
 define write_image
-	dd if=$(1) of=$(2) bs=512 conv=notrunc seek=$(3) oflag=seek_bytes
+	dd if=$(1) of=$(2) bs=512 conv=notrunc seek=$(3) oflag=seek_bytes $(ESILENT)
 endef
 
-vm-burn: $(VM_DISK) all
-	set -e ;\
-	LOADER_SIZE=$$(stat -c "%s" result/loader.bin) ;\
-	LOADER_SECTORS=$$((($$LOADER_SIZE + 511) / 512)) ;\
-	result/binecho $$LOADER_SECTORS | (dd of=result/pbr.bin bs=1 count=2 seek=92 conv=notrunc 2>/dev/null)
-	result/binecho 2049 | (dd of=result/pbr.bin bs=1 count=8 seek=98 conv=notrunc 2>/dev/null)
-	$(call write_boot_record,result/mbr.bin,"$(VM_DISK)",0)
-	$(call write_boot_record,result/pbr.bin,"$(VM_DISK)",$(MiB))
-	$(call write_image,result/loader.bin,"$(VM_DISK)",$$(($(MiB)+512)))
+
 
 
 vm-run32: vm-burn
@@ -171,9 +288,9 @@ dev := /dev/sdd
 _:
 #	It would suck to wipe someone's MBR by accident
 	[ x$$(whoami) = xkodirovsshik ]
-	sudo fdisk -l $(dev) | grep -i myusb >/dev/null
+	sudo fdisk -l $(dev) | grep -i myusb $(SILENT)
 	$(MAKE) vm-burn
 	sudo dd if=$(VM_DISK) of=$(dev) bs=1M count=2
 
 print_serial_port_dump:
-	dd if=$(VM_DISK) bs=512 skip=1920 count=128 2>/dev/null | cat
+	dd if=$(VM_DISK) bs=512 skip=1920 count=128 $(ESILENT) | cat

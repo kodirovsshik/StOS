@@ -1,8 +1,9 @@
 
-override BIN := ../result/binecho
-override SRC := src/binecho.cpp
+override BINECHO_SRC_DIR := $(BINECHO_DIR)/src
+override BINECHO_SRC := $(BINECHO_SRC_DIR)/binecho.cpp
 
-$(BIN): $(SRC)
-	$(_CXX) $(SRC) -o $(BIN)
+$(BINECHO_BIN): $(BINECHO_SRC)
+	$(_CXX) $^ -o $@
 
-clean:
+clean-sub-$(BINECHO_DIR):
+	rm -f $(BINECHO_BIN)

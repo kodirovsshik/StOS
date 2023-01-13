@@ -10,7 +10,7 @@ SECTIONS
 	PROVIDE(_kernel_text_begin = .);
 	.text :
 	{
-		tmp/kentry.asm.elf(.text)
+		*kentry.asm.elf(.text)
 		*(.text*)
 	}
 

@@ -76,9 +76,10 @@ int xsystem(string_view cmd)
 
 int main(int argc, char** argv)
 {
-	rassert(argc == 3, 1, "%s: 2 arguments required", argv[0]);
+	rassert(argc == 4, 1, "%s: 3 arguments required", argv[0]);
 	string_view disk = argv[1];
 	string_view mount_point = argv[2];
+	string_view kernel_bin = argv[3];
 	string loop_device;
 	bool mounted = false;
 	bool err = false;
@@ -89,18 +90,18 @@ int main(int argc, char** argv)
 		tassert(!loop_device.empty(), "losetup failed");
 
 		tassert(0 == xsystem(
-			format("mkfs.fat -F32 {}", loop_device).data()
+			format("mkfs.fat -F32 {}", loop_device)
 			), "mkfs.fat failed"
 		);
 
 		tassert(0 == xsystem(
-			format("mount {} {}", loop_device, mount_point).data()
+			format("mount {} {}", loop_device, mount_point)
 			), "mount failed"
 		);
 		mounted = true;
 
 		tassert(0 == xsystem(
-			format("cp result/kernel.bin {}/", mount_point)
+			format("cp {} {}/", kernel_bin, mount_point)
 			), "cp failed"
 		);
 

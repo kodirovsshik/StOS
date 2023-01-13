@@ -1,9 +1,10 @@
 
-override BIN := ../result/vm_preparator
-override SRC := src/vm_preparator.cpp
+override VM_PREPARATOR_SRC_DIR := $(VM_PREPARATOR_DIR)/src
+override VM_PREPARATOR_SRC := $(VM_PREPARATOR_SRC_DIR)/vm_preparator.cpp
 
-$(BIN): $(SRC)
-	$(_CXX) $(SRC) -o $(BIN) -std=c++20 -O0
+$(VM_PREPARATOR_BIN): $(VM_PREPARATOR_SRC)
+	$(_CXX) -O0 $^ -o $@ -std=c++20
 #No optimization because the compilation already runs long enough
 
-clean:
+clean-sub-$(VM_PREPARATOR_DIR):
+	rm -f $(VM_PREPARATOR_BIN)

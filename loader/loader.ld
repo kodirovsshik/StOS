@@ -9,7 +9,7 @@ SECTIONS
   . = loader_begin;
 	.text :
 	{
-		tmp/loader.elf16(.text)
+		*loader.elf16(.text)
     *(.text*)
 	}
   .data :

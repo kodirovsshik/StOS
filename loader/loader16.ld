@@ -6,7 +6,7 @@ SECTIONS
 {
 	.text :
 	{
-		tmp/loader.asm.elf(.text)
+		*loader.asm.elf(.text)
 		*(.text)
 	}
 }

@@ -1,6 +1,8 @@
 
 #Do not include build results
-result/
+*.elf
+*.bin
+*.disasm
 vm/
 
 #Neither any intermediate results
@@ -11,5 +13,3 @@ vm/
 
 #useless
 .vscode/
-.vscode/*
-
