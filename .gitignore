@@ -13,3 +13,6 @@ vm/
 
 #useless
 .vscode/
+
+#In case bochs crashes and leaves .lock file behind
+*.lock

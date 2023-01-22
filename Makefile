@@ -92,12 +92,8 @@ VM_DISK_SIZE_MiB := 2
 VM_MEMORY_MiB := 32
 
 override VM_MNT := $(VM_DIR)/mnt
-override LOOPDEV = $(shell losetup --show -f $(VM_DISK) -o 1MiB)
 
-override _QEMU_ARGS := \
-	$(QEMU_ARGS) \
-	-m $(VM_MEMORY_MiB) \
-	-drive file="$(VM_DISK)",format=raw \
+override _QEMU_ARGS := $(QEMU_ARGS) -m $(VM_MEMORY_MiB) -drive file="$(VM_DISK)",format=raw
 
 #Customization points
 QEMU32 := qemu-system-i386
@@ -268,6 +264,19 @@ vm-debug32:
 	$(call vm_debug,$(RUN_QEMU32),gdb/init32.gdb)
 vm-debug64:
 	$(call vm_debug,$(RUN_QEMU64),gdb/init64.gdb)
+
+
+define bochs_debug
+	rm -f $(VM_DISK).lock
+	bochs -qf $(1) || true
+endef
+
+bochs-run32:
+	bochs -qf bochs/conf32
+
+bochs-run64:
+	bochs -qf bochs/conf64
+
 
 #burns $(VM_DISK) to my USB stick $(dev)
 #for ease of testing on real hardware

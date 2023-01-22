@@ -1,0 +1,11 @@
+build fails on nasm 2.14.smth due to not being able to assemble 
+	mov dword seg:[addr], value 
+which is a correct instruction
+
+Required apt packages: bochs bochs-x bochsbios vgabios
+Or bochs compiled by oneself with all necessary features enabled
+
+Bochs runs into triple fault when uses the default bochsbios 
+from apt but works just fine when run with bios present as 
+a part of manually compiled emulator with othewise similar settings.
+I don't get it.
