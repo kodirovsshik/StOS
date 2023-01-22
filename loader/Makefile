@@ -51,6 +51,9 @@ $(LOADER_TMP)/%.cpp32.elf: $(LOADER_SRC32)/%.cpp | $(LOADER_LAYOUT)
 $(LOADER_ELF16): $(LOADER_OBJ16) $(LOADER_DIR)/loader16.ld
 	$(LINKER_FOR_TARGET) -r -o $@ $(LOADER_OBJ16) -T $(LOADER_DIR)/loader16.ld
 	$(OBJCOPY_TARGET) -w -L \* $@ $@
+	$(OBJCOPY_TARGET) --globalize-symbol=edata $@ $@
+	$(OBJCOPY_TARGET) --globalize-symbol=kernel_listing_sector $@ $@
+	$(OBJCOPY_TARGET) --globalize-symbol=pbr_disk $@ $@
 
 $(LOADER_ELF32): $(LOADER_OBJ32)
 	$(LINKER_FOR_TARGET) -Wl,-melf_i386 -r -o $@ $(LOADER_OBJ32)

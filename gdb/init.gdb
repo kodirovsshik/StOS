@@ -1,10 +1,5 @@
 
-tui enable
-layout src
-layout regs
-focus cmd
-
 set disassembly-flavor intel
+tui enable
 
-display/x { $eax, $ebx, $ecx, $edx, $esi, $edi, $ebp, $esp }
-display/x { $cs, $ds, $ss, $es, $fs, $gs }
+target remote localhost:1234

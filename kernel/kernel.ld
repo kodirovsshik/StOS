@@ -16,6 +16,7 @@ SECTIONS
 
 	. = ALIGN(4096);
 	PROVIDE(_kernel_text_end = .);
+	
 	PROVIDE(_kernel_data_begin = .);
 	PROVIDE(_kernel_rwdata_begin = .);
 
@@ -26,6 +27,7 @@ SECTIONS
 
 	. = ALIGN(8);
 	PROVIDE(_kernel_data_end = .);
+	
 	PROVIDE(_kernel_bss_begin = .);
 
 	.bss (NOLOAD) :
@@ -34,8 +36,9 @@ SECTIONS
 	}
 
 	. = ALIGN(4096);
-	PROVIDE(_kernel_rwdata_end = .);
 	PROVIDE(_kernel_bss_end = .);
+	PROVIDE(_kernel_rwdata_end = .);
+
 	PROVIDE(_kernel_rodata_begin = .);
 
 	.rodata :

@@ -3,25 +3,18 @@
 #include "include/interrupt.hpp"
 #include "include/alloc.hpp"
 #include "include/conio.hpp"
+#include "include/loader_common.hpp"
+#include "include/ram.hpp"
 
 void fill_memory_table();
 void fill_memory_table_fallback();
 void sort_memory_table();
 void print_memory_table();
-void ensure_kernel_load_memory_usable();
 void try_fill_memory_table_e820();
 void get_upper_memory_data_e881(uint32_t& at1m, uint64_t& at16m);
 void get_lower_memory_data_int12(uint32_t&);
 [[noreturn]] void error_memory_detection();
 
-
-struct memory_map_entry_t
-{
-	uint64_t begin, end;
-	uint32_t type;
-	uint32_t flags;
-};
-static_assert(sizeof(memory_map_entry_t) == 24, "");
 
 #define memory_map_addr c_get_memory_map_addr()
 #define memory_map_size c_get_memory_map_size()
@@ -37,9 +30,7 @@ void do_subtask_memory()
 	if (memory_map_size == 0)
 		error_memory_detection();
 	sort_memory_table();
-	//resolve_memory_table_overlaps();
 	print_memory_table();
-	ensure_kernel_load_memory_usable();
 }
 
 void sort_memory_table()
@@ -71,6 +62,7 @@ void sort_memory_table()
 	}
 }
 
+
 void print_memory_table()
 {
 	const auto n = memory_map_size;
@@ -88,37 +80,6 @@ void print_memory_table()
 		cputc('\n');
 	}
 }
-
-//Ensure memory region [1 MiB; 1 MiB + delta) exists and is available
-void ensure_kernel_load_memory_usable()
-{
-	const uint32_t kernel_minimum_memory = 64 * KiB;
-
-	//To be moved to last available 32-bit address in a region starting at 1 MiB
-	uint32_t low = MiB;
-	const uint32_t high = low + kernel_minimum_memory;
-
-	const auto n = memory_map_size;
-	const auto* table = memory_map_addr;
-	for (uint16_t i = 0; i < n; ++i)
-	{
-		auto& entry = table[i];
-		if (entry.begin > UINT32_MAX)
-			break;
-		if (low >= high)
-			break;
-		if (entry.type != 1)
-			continue;
-		if (low >= entry.begin && low < entry.end)
-			low = (uint32_t)min<uint64_t>(entry.end, UINT32_MAX);
-	}
-	cputs("Available memory at 1 MiB: ");
-	cput32u((low - MiB + 512) / KiB);
-	cputs(" KiB\n");
-	if (low < high)
-		cpanic("Not enough memory available at 1 MiB");
-}
-
 
 void fill_memory_table()
 {
@@ -177,14 +138,27 @@ void try_fill_memory_table_e820()
 			break;
 		if (regs.flags & EFLAGS_CARRY)
 			break;
+		if (entry.type != 1)
+			goto skip_current_entry; 
+		//forgive me god for using goto,
+		//but it actually fits the program logic really well
 		if (regs.cx < 24)
 			entry.flags = 1;
 		if ((entry.flags & 1) == 0 || (entry.flags & 2))
-			continue;
-		
+			goto skip_current_entry;
+
 		entry.end += entry.begin;
+		
+		entry.begin = (entry.begin + 4095) & ~(uint64_t)4095; //Round up to page boundary
+		if (entry.begin != 0) //low memory is special
+			entry.end = (entry.end) & ~(uint64_t)4095; //Round down to page boundary
+
+		if (entry.begin >= entry.end)
+			goto skip_current_entry;
+		
 		memory_map_addr[memory_map_size++] = entry;
 
+skip_current_entry:
 		if (index == 0)
 			break;
 	}
@@ -202,7 +176,9 @@ void get_upper_memory_data_e881(uint32_t& at1m, uint64_t& at16m)
 		interrupt(&regs, 0x15);
 		if (regs.flags & EFLAGS_CARRY)
 			return;
-		//Contents of high words is not defined for this interrupt
+		//Contents of registers' high words is not defined for this interrupt
+		//At least, I haven't seen a doc which would define it to be 0
+		//so playing safe here
 		regs.eax = regs.ax;
 		regs.ecx = regs.cx;
 		regs.edx = regs.dx;
@@ -215,7 +191,7 @@ void get_upper_memory_data_e881(uint32_t& at1m, uint64_t& at16m)
 		regs.ebx = regs.edx;
 	}
 
-	at1m = regs.eax * 1024;
+	at1m = (regs.eax * 1024) & ~(uint32_t)4095;
 	at16m = (uint64_t)regs.ebx * 65536;
 }
 void get_lower_memory_data_int12(uint32_t& mem)

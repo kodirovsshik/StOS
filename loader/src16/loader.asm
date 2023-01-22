@@ -20,22 +20,18 @@
 ;		Pick largest video mode not exceeding 768 in height
 ;		If no found, pick the one with smallest height
 ;✓	Read disk UUID
-;	Setup protected mode environment
-;		Basic temporary GDT with 32-bit code and data segments
+;✓	Setup protected mode environment
+;✓		Basic temporary GDT with 32-bit code and data segments
 ;
 ;At this point, the plan is not thoroughly thought out anymore
 ;
-;	Go 32 bit mode
-;		By this point, we should have already been using C++
-;		Load the kernel at 0x100000
+;✓	Go 32 bit mode
+;✓		By this point, we should have already been using C++
+;✓		Load the kernel at 0x100000
 ;	Setup 64-bit environment
 ;		Identity page mapping for usable memory pages
-;			except for [0x100000; ...) being excluded
-;			and instead mapped at -2GB address:
+;			plus [0x100000; ...) being mapped at -2GB:
 ;				[0xFFFFFFFF80000000; ...) -> [0x100000; ...);
-;			and 640KiB starting at 0 being identity-mapped
-;	Flex off with some PCI commands to locate the boot device
-;	Load the kernel at 0x100000
 ;	Transfer the control to 64-bit environment
 
 
@@ -50,6 +46,8 @@
 ;		0x0600: loader
 ;		0x7C00: PBR
 ;	Segment 0x1000: output log buffer
+;	Segment 0x2000: intermediate buffer for reading the kernel
+;	Segment 0x3000: initial paging tables
 
 
 ;Conventions:
@@ -63,7 +61,6 @@
 
 
 ;functions
-;global halt
 global halt
 global panic
 global cpanic
@@ -76,9 +73,11 @@ global edata.memory_map_size
 global edata.e820_ok
 global edata.vbe_modes_ptr
 global edata.vbe_modes_count
-global bss.pbr_disk
+global pbr_disk
 global c_get_memory_map_addr
 global c_get_memory_map_size
+global kernel_listing_sector
+global edata
 
 ;functions
 extern put32x
@@ -113,7 +112,7 @@ rodata:
 
 SECTION .bss
 bss:
-	.pbr_disk resb 1
+	pbr_disk resb 1
 
 
 
@@ -127,7 +126,13 @@ loader_begin:
 
 
 
-align 8, nop
+align 4, db 0xCC
+	kernel_listing_sector dd 0
+%if kernel_listing_sector - loader_begin != 4
+%error Imported data misplacement
+%endif
+
+align 8, db 0xCC
 edata: ;data structure to be read by kernel
 	.boot_disk_uuid times 16 db 0
 	.boot_partition_lba dq 0
@@ -136,6 +141,8 @@ edata: ;data structure to be read by kernel
 	.vbe_modes_count dw 0
 	.memory_map_size dw 0
 	.initial_vbe_mode dw 0
+
+
 
 
 
@@ -153,18 +160,18 @@ loader_main:
 	mov ss, ax
 
 	sti
+	cld
 
 	call setup_exception_handlers
 
 .clear_bss:
-	cld
 	mov di, bss_begin
 	mov cx, bss_size_in_words
 	xor ax, ax
 	rep stosw
 
 .store_pbr_data:
-	mov [bss.pbr_disk], dl
+	mov [pbr_disk], dl
 
 	mov si, PBR_LBA_ADDR
 	mov di, edata.boot_partition_lba
@@ -255,14 +262,20 @@ cpanic:
 
 
 do_subtask_disk_uuid:
+	sub esp, 512
+	mov eax, esp
+
 	times 2 push dword 0
-	push dword loader_end
+	push eax
 	push dword 0x00010010
+	
 	mov si, sp
 	mov ah, 0x42
-	mov dl, [bss.pbr_disk]
+	mov dl, [pbr_disk]
 	int 0x13
-	mov eax, [loader_end + 512 - 2 - 64 - 6]
+
+	mov eax, [esp + 512 - 2 - 64 - 6]
 	mov [edata.boot_disk_uuid], eax
-	add sp, 16
+	
+	add sp, 512 + 16
 	ret

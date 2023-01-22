@@ -5,6 +5,7 @@
 #include "include/alloc.hpp"
 #include "include/conio.hpp"
 #include "include/loader.hpp"
+#include "include/loader_common.hpp"
 
 
 

@@ -1,6 +1,6 @@
 BITS 16
 
-ORG 0x7C00
+ORG 0x600
 
 entry:
     jmp short start
@@ -23,6 +23,7 @@ start:
     mov sp, 0x7C00
     mov si, sp
 
+    sti
     ;preserve for plug & play
     push di
 
@@ -32,12 +33,11 @@ start:
     mov di, 0x0600
     mov cx, 256
     rep movsw
-    jmp 0x0000:adjust_cs_ip - (0x7C00 - 0x600)
+    jmp 0x0000:.relocated
+.relocated:
 
-adjust_cs_ip:
-    sti
 
-    mov bx, 0x600 + 512 - 2 - 64 - 16
+    mov bx, partition_table - 16
     mov cx, 4
 
 read_loop:
@@ -65,7 +65,7 @@ read_loop:
     xor ax, ax
     mov bx, ax
     mov cx, ax
-    jmp 0x0000:0x7C00
+    jmp 0x7C00
 
 read_error:
     mov ax, 0x0002
@@ -85,10 +85,10 @@ read_error:
 
 fail:
     int 0x18
-    ;jmp halt
 halt:
     hlt
     jmp halt
+
 
 lba:
 	db 16
@@ -101,6 +101,7 @@ lba:
 	dw 0
 .lba:
 	dq 0
+
 
 pad:
 times 440 - ($ - entry) db 0xCC

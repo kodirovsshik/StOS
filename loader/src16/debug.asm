@@ -50,8 +50,9 @@ common_exception_handler:
 
 
 setup_exception_handlers:
+	xor edi, edi
 	mov eax, unknown_exception_handler
-	mov cx, 7
+	mov cx, 8
 	rep stosd
 	mov dword [24], ud_handler
 	mov dword [0xC*4], ss_handler

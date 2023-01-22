@@ -18,7 +18,7 @@ global data.output_use_screen
 global data.output_use_log
 global data.output_use_serial
 
-extern bss.pbr_disk
+extern pbr_disk
 
 
 SECTION .data
@@ -291,7 +291,7 @@ save_output_buffer:
 	mov byte [bx], 0
 	pop ds
 
-	mov dl, [bss.pbr_disk]
+	mov dl, [pbr_disk]
 
 	;IO of 64KiB at once is not supported by some BIOSes' int13 extensions
 	;(Including my development machine with most recent BIOS, for some reason??)

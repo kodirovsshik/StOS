@@ -16,10 +16,11 @@ end
 set tdesc filename gdb/target16.xml
 set architecture i8086
 
-target remote localhost:1234
-
 add-symbol-file loader/loader.elf
-add-symbol-file kernel/kernel.elf
+
+layout src
+layout regs
+focus cmd
 
 break loader_main.loader_end
 

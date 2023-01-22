@@ -121,15 +121,6 @@ override UTILS :=
 override UTILS_DIRS :=
 
 
-#Customization point (output binary name)
-BINECHO_BIN_NAME := binecho.elf
-override BINECHO_DIR := binecho
-override BINECHO_BIN := $(BINECHO_DIR)/$(BINECHO_BIN_NAME)
-override BINECHO := $(BINECHO_BIN)
-override UTILS_DIRS += $(BINECHO_DIR)
-override UTILS += $(BINECHO_BIN)
-include $(BINECHO_DIR)/Makefile
-
 
 #Customization point (output binary name)
 VM_PREPARATOR_BIN_NAME := vm_preparator.elf
@@ -217,35 +208,27 @@ wipe: clean vm-clean
 .PHONY: vm-create vm-clean vm-recreate vm-burn vm-run vm-debug16
 
 
-vm-create:
-	mkdir -p $(VM_MNT)
+
+$(VM_DISK): $(MBR_BIN)
+	mkdir -p $(VM_DIR)
 	dd if=/dev/zero of=$(VM_DISK) bs=1M count=$(VM_DISK_SIZE_MiB)
+	sfdisk $(VM_DISK) >/dev/null <sfdisk_script
+	$(call write_boot_record,$(MBR_BIN),"$(VM_DISK)",0)
+
+
+vm-create: $(VM_DISK)
 
 vm-clean:
 	rm -rf $(VM_DIR)
 
-vm-recreate: vm-clean
-	$(MAKE) vm-create
+vm-reburn: vm-clean
+	$(MAKE) vm-burn
 
-vm-burn: $(VM_DISK)
-
-$(VM_DISK): $(BINARIES) $(UTILS)
-	$(MAKE) vm-recreate
-	bash -c "echo -e 1M,\\\\nwrite | sfdisk $(VM_DISK)" >/dev/null
-# ^^^ I hate myself for writing this ^^^
-#but it keeps -e in the output for some reason if i don't wrap it with bash -c
-	sfdisk --part-type $(VM_DISK) 1 0c $(SILENT)
-
-	sudo $(VM_PREPARATOR) $(VM_DISK) $(VM_MNT) $(KERNEL_BIN)
-
-	$(BINECHO) $(LOADER_SECTORS) | (dd of=$(PBR_BIN) bs=1 count=2 seek=92 conv=notrunc $(ESILENT))
-	$(BINECHO) 2049 | (dd of=$(PBR_BIN) bs=1 count=8 seek=98 conv=notrunc $(ESILENT))
-
-	$(call write_boot_record,$(MBR_BIN),"$(VM_DISK)",0)
+vm-burn: $(VM_DISK) $(BINARIES) $(UTILS)
+	sudo $(VM_PREPARATOR) $(VM_DISK) $(VM_MNT) $(KERNEL_BIN) $(PBR_BIN) $(LOADER_BIN)
 	$(call write_boot_record,$(PBR_BIN),"$(VM_DISK)",$(MiB))
-	$(call write_image,$(LOADER_BIN),"$(VM_DISK)",$$(($(MiB)+512)))
-	sfdisk -A $(VM_DISK) 1
-	
+	sfdisk -A $(VM_DISK) 1 >/dev/null
+
 
 
 define write_boot_record
@@ -270,6 +253,7 @@ vm-run: vm-burn
 	$(RUN_QEMU64) -cpu host --enable-kvm
 
 define vm_debug
+	$(MAKE) vm-burn
 	$(1) -S -s $(DETACHED) ;\
 	gdb -x gdb/defs.gdb \
 		-x gdb/init.gdb \
@@ -278,12 +262,12 @@ define vm_debug
 	kill -9 $$! || true
 endef
 
-vm-debug16: vm-burn
+vm-debug16:
 	$(call vm_debug,$(RUN_QEMU32),gdb/init16.gdb)
-#vm-debug32: vm-burn
-#	$(call vm_debug,$(RUN_QEMU32),gdb/init32.gdb)
-#vm-debug64: vm-burn
-#	$(call vm_debug,$(RUN_QEMU64),gdb/init64.gdb)
+vm-debug32:
+	$(call vm_debug,$(RUN_QEMU32),gdb/init32.gdb)
+vm-debug64:
+	$(call vm_debug,$(RUN_QEMU64),gdb/init64.gdb)
 
 #burns $(VM_DISK) to my USB stick $(dev)
 #for ease of testing on real hardware
