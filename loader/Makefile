@@ -1,6 +1,5 @@
 
 override LOADER_ELF = $(subst .bin,.elf,$(LOADER_BIN))
-override LOADER_DISASM = $(subst .bin,.disasm,$(LOADER_BIN))
 override LOADER_SRC :=
 
 override LOADER_SRC16 := $(LOADER_DIR)/src16
@@ -54,11 +53,13 @@ $(LOADER_ELF16): $(LOADER_OBJ16) $(LOADER_DIR)/loader16.ld
 	$(OBJCOPY_TARGET) --globalize-symbol=edata $@ $@
 	$(OBJCOPY_TARGET) --globalize-symbol=kernel_listing_sector $@ $@
 	$(OBJCOPY_TARGET) --globalize-symbol=pbr_disk $@ $@
+	ndisasm -o 0x600 $@ > $@.disasm
 
 $(LOADER_ELF32): $(LOADER_OBJ32)
 	$(LINKER_FOR_TARGET) -Wl,-melf_i386 -r -o $@ $(LOADER_OBJ32)
 	$(OBJCOPY_TARGET) -w -L \* $@ $@
 	$(OBJCOPY_TARGET) --globalize-symbol=go_pm $@ $@
+	ndisasm -b 32 $@ > $@.disasm
 
 $(LOADER_ELF): $(LOADER_ELF16) $(LOADER_ELF32) $(LOADER_DIR)/loader.ld
 	$(LINKER_FOR_TARGET) $(LOADER_ELF16) $(LOADER_ELF32) -o $(LOADER_ELF) \
@@ -67,7 +68,6 @@ $(LOADER_ELF): $(LOADER_ELF16) $(LOADER_ELF32) $(LOADER_DIR)/loader.ld
 $(LOADER_BIN): $(LOADER_ELF)
 	$(OBJCOPY_TARGET) $(LOADER_ELF) $@ -O binary
 	chmod a-x $@ $(LOADER_ELF) $(LOADER_BIN)
-	ndisasm -o 0x600 $@ > $(LOADER_DISASM)
 
 clean-sub-$(LOADER_DIR):
 	rm -rf $(LOADER_TMP)
