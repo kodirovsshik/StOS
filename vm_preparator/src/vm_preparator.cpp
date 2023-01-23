@@ -759,7 +759,18 @@ int main(int argc, char** argv)
 	}
 	
 	lodev.close();
-	umount();
+	while (true)
+	{
+		try
+		{
+			umount();
+		}
+		catch(...)
+		{
+			continue;
+		}
+		break;
+	}
 	detach_loop_device();
 
 	return (int)err;
