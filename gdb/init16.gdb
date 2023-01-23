@@ -1,4 +1,10 @@
 
+define nskip
+	br *($eip+$arg0)
+	c
+	del br $bpnum
+end
+
 define nint
 	nskip 2	
 end

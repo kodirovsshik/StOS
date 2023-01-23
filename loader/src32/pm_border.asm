@@ -3,6 +3,7 @@ global go_pm
 global interrupt
 
 extern pm_main
+extern go_lm
 
 
 
@@ -36,7 +37,7 @@ _gdt:
 	dw 0x0000
 	db 0x00
 	db 0x98
-	db 0x80
+	db 0x00
 	db 0x00
 
 .data16:
@@ -44,7 +45,7 @@ _gdt:
 	dw 0x0000
 	db 0x00
 	db 0x92
-	db 0x80
+	db 0x00
 	db 0x00
 
 .end:
@@ -79,6 +80,8 @@ go_pm:
 BITS 32
 .in_pm:
 	call pm_main
+	test eax, eax
+	jns go_lm
 
 	mov ax, seg_data16
 	mov ds, ax

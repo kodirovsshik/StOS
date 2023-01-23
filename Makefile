@@ -44,7 +44,7 @@ override _NASM_ARGS += -Wall -Werror -Wno-unknown-warning -Ox
 
 #Customization points (compilers for specific targets)
 CXX_FOR_TARGET := x86_64-pc-elf-g++
-CXX64_FOR_TARGET := $(CXX_FOR_TARGET) -m64
+CXX64_FOR_TARGET := $(CXX_FOR_TARGET) -m64 -mcmodel=large
 CXX32_FOR_TARGET := $(CXX_FOR_TARGET) -m32
 CXX16_FOR_TARGET := $(CXX_FOR_TARGET) -m16
 
@@ -201,7 +201,7 @@ wipe: clean vm-clean
 
 
 
-.PHONY: vm-create vm-clean vm-recreate vm-burn vm-run vm-debug16
+.PHONY: vm-create vm-clean vm-recreate vm-burn qemu-run vm-debug16
 
 
 
@@ -241,41 +241,50 @@ endef
 
 
 
-vm-run32: vm-burn
+qemu-run32: vm-burn
 	$(RUN_QEMU32)
-vm-run64: vm-burn
+qemu-run64: vm-burn
 	$(RUN_QEMU64)
-vm-run: vm-burn
+qemu-run: vm-burn
 	$(RUN_QEMU64) -cpu host --enable-kvm
 
+define qemu_debug
+	$(call vm_debug,$(1) -S -s,$(2))
+endef
 define vm_debug
 	$(MAKE) vm-burn
-	$(1) -S -s $(DETACHED) ;\
+	$(1) $(DETACHED) ;\
 	gdb -x gdb/defs.gdb \
 		-x gdb/init.gdb \
 		-x $(2) \
-		$(GDB_ARGS) ;\
+		$(GDB_ARGS) || true;\
 	kill -9 $$! || true
 endef
 
-vm-debug16:
-	$(call vm_debug,$(RUN_QEMU32),gdb/init16.gdb)
-vm-debug32:
-	$(call vm_debug,$(RUN_QEMU32),gdb/init32.gdb)
-vm-debug64:
-	$(call vm_debug,$(RUN_QEMU64),gdb/init64.gdb)
+qemu-debug16:
+	$(call qemu_debug,$(RUN_QEMU32),gdb/init16.gdb)
+qemu-debug32:
+	$(call qemu_debug,$(RUN_QEMU32),gdb/init32.gdb)
+qemu-debug64:
+	$(call qemu_debug,$(RUN_QEMU64),gdb/init64.gdb)
 
 
 define bochs_debug
 	rm -f $(VM_DISK).lock
-	bochs -qf $(1) || true
+	$(call vm_debug,bochs -qf $(1),$(2))
 endef
 
-bochs-run32:
+bochs-run32: vm-burn
+	rm -f $(VM_DISK).lock
 	bochs -qf bochs/conf32
 
-bochs-run64:
+bochs-run64: vm-burn
+	rm -f $(VM_DISK).lock
 	bochs -qf bochs/conf64
+
+bochs-debug64:
+	$(call bochs_debug,bochs/conf64d,gdb/init64.gdb)
+
 
 
 #burns $(VM_DISK) to my USB stick $(dev)

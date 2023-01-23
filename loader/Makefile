@@ -46,7 +46,7 @@ $(LOADER_TMP)/%.cpp16.elf: $(LOADER_SRC16)/%.cpp | $(LOADER_LAYOUT)
 	$(CXX16) $< -o $@ $(call get_osize,$(CXX16)) $(LOADER_CXX_ARGS)
 
 $(LOADER_TMP)/%.cpp32.elf: $(LOADER_SRC32)/%.cpp | $(LOADER_LAYOUT)
-	$(CXX32) $< -o $@ $(call get_osize,$(CXX32)) $(LOADER_CXX_ARGS)
+	$(CXX32) -std=c++20 $< -o $@ $(call get_osize,$(CXX32)) $(LOADER_CXX_ARGS)
 
 $(LOADER_ELF16): $(LOADER_OBJ16) $(LOADER_DIR)/loader16.ld
 	$(LINKER_FOR_TARGET) -r -o $@ $(LOADER_OBJ16) -T $(LOADER_DIR)/loader16.ld

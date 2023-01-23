@@ -87,21 +87,25 @@ struct page_map
 static_assert(sizeof(page_map) == 4096);
 
 
-void mmap(uint64_t physical, uint64_t virtual_)
-{
-#define PME_PRESENT_BIT (1 << 0)
-#define PME_WRITABLE_BIT (1 << 1)
 
+#define MMAP_PRESENT (1 << 0)
+#define MMAP_WRITABLE (1 << 1)
+#define MMAP_WRITETHROUGH (1 << 3)
+#define MMAP_NOT_CACHABLE (1 << 4)
+#define MMAP_ATTRIBS_MASK 0xFFE
+
+void mmap(uint64_t physical, uint64_t virtual_, uint16_t attribs = MMAP_WRITABLE)
+{
 	uint32_t current_address = paging_data.page_map_base;
 	for (int off = 39; off >= 21; off -= 9)
 	{
 		const uint32_t index = (virtual_ >> off) & 511;
 		auto ptr = (page_map*)current_address;
 		auto& next_addr = ptr->entries[index];
-		if ((next_addr & PME_PRESENT_BIT) == 0)
+		if ((next_addr & MMAP_PRESENT) == 0)
 		{
 			next_addr = paging_data.alloc();
-			next_addr |= PME_PRESENT_BIT | PME_WRITABLE_BIT;
+			next_addr |= MMAP_PRESENT | MMAP_WRITABLE;
 		}
 		//1 top and 12 lower bits are flags
 		current_address = (uint32_t)(next_addr & 0x7FFFFFFFFFFFF000u);
@@ -109,7 +113,10 @@ void mmap(uint64_t physical, uint64_t virtual_)
 	const uint32_t index = (virtual_ >> 12) & 511;
 	auto& entry = ((page_map*)current_address)->entries[index];
 	entry = physical & ~(uint64_t)4095;
-	entry |= PME_PRESENT_BIT | PME_WRITABLE_BIT;
+
+	attribs &= MMAP_ATTRIBS_MASK;
+	attribs |= MMAP_PRESENT;
+	entry |= attribs;
 }
 
 void setup_paging_initial()
@@ -117,9 +124,15 @@ void setup_paging_initial()
 	paging_data.page_map_base =
 	paging_data.free_paging_area = 
 		0x30000;
+	
 	paging_data.alloc();
-	for (int i = 0; i < 16; ++i)
+	
+	//Ordinary low memory
+	for (int i = 0; i < 128; ++i)
 		mmap(4096 * i, 4096 * i);
+	//Video memory
+	for (int i = 160; i < 192; ++i)
+		mmap(4096 * i, 4096 * i, MMAP_WRITABLE | MMAP_WRITETHROUGH);
 }
 
 uint32_t next_kernel_load_page()
@@ -223,6 +236,44 @@ void load_kernel()
 }
 
 
+
+struct idt_entry
+{
+	uint16_t offset1;
+	uint16_t selector = 8;
+	uint8_t _reserved0 = 0;
+	uint8_t type : 4 = 0xF;
+	bool _reserved1 : 1 = 0;
+	uint8_t dbp : 2 = 0;
+	bool present : 1 = 0;
+	uint16_t offset2;
+	uint32_t offset3;
+	uint32_t _reserved2 = 0;
+};
+static_assert(sizeof(idt_entry) == 16);
+
+extern "C" idt_entry idt64[32];
+extern "C" uint32_t idt_handlers[32];
+void fill_idt()
+{
+	for (int i = 0; i < 32; ++i)
+	{
+		auto& entry = idt64[i];
+		entry = idt_entry{};
+
+		uint32_t isr = idt_handlers[i];
+		if (isr == 0)
+			continue;
+
+		entry.present = 1;
+		entry.offset1 = (uint16_t)isr;
+		entry.offset2 = (uint16_t)(isr >> 16);
+		entry.offset3 = 0;
+	}
+}
+
+
+
 extern "C"
 uint64_t pm_main()
 {
@@ -230,6 +281,7 @@ uint64_t pm_main()
 	load_kernel();
 	if (return_data.io_status != 0)
 		return_data.error = true;
+	fill_idt();
 	return return_data.value;
 }
 

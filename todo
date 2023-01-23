@@ -1,2 +1,3 @@
 Implement A20 enable via keyboard controller
 
+Handle kernel loading errors
