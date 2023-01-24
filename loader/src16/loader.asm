@@ -260,11 +260,11 @@ cpanic:
 
 
 do_subtask_disk_uuid:
-	sub esp, 512
-	mov eax, esp
+	sub sp, 512
+	mov ebx, esp
 
 	times 2 push dword 0
-	push eax
+	push ebx
 	push dword 0x00010010
 	
 	mov si, sp
@@ -272,7 +272,7 @@ do_subtask_disk_uuid:
 	mov dl, [pbr_disk]
 	int 0x13
 
-	mov eax, [esp + 512 - 2 - 64 - 6]
+	mov eax, [bx + 512 - 2 - 64 - 6]
 	mov [edata.boot_disk_uuid], eax
 	
 	add sp, 512 + 16
