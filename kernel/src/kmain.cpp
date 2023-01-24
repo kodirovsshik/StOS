@@ -22,9 +22,19 @@ void print_at(const char* s, int row, int column, int color = 0x02)
 	}
 }
 
-extern "C" [[noreturn]]
-void kmain()
+struct loader_data_t
 {
+	uint8_t boot_disk_uuid[16];
+	uint64_t boot_partition_lba;
+	uint32_t memory_map_addr;
+	uint16_t memory_map_size;
+	uint16_t output_buffer_index;
+};
+
+extern "C" [[noreturn]]
+void kmain(loader_data_t* loader_data)
+{
+	(void)loader_data;
 	cls();
 	print_at("In kernel", 1, 1);
 	halt();

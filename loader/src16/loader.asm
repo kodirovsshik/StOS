@@ -136,11 +136,9 @@ align 8, db 0xCC
 edata: ;data structure to be read by kernel
 	.boot_disk_uuid times 16 db 0
 	.boot_partition_lba dq 0
-	.vbe_modes_ptr dd 0
 	.memory_map_addr dd 0
-	.vbe_modes_count dw 0
 	.memory_map_size dw 0
-	.initial_vbe_mode dw 0
+	.output_buffer_index dw 0
 
 
 

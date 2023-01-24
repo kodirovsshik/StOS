@@ -34,11 +34,9 @@ struct alignas(8) edata_t
 {
 	uint8_t boot_disk_uuid[16];
 	uint64_t boot_partition_lba;
-	uint32_t vbe_modes_ptr;
 	uint32_t memory_map_addr;
-	uint16_t vbe_modes_count;
 	uint16_t memory_map_size;
-	uint16_t initial_vbe_mode;
+	uint16_t output_buffer_index;
 };
 extern "C" edata_t edata;
 
