@@ -190,11 +190,11 @@ loader_main:
 
 	call dword do_subtask_memory
 
-	call do_subtask_a20_line
+	call dword do_subtask_a20_line
 
 	call dword do_subtask_vbe
 
-	call do_subtask_disk_uuid
+	call dword do_subtask_disk_uuid
 
 	call dword go_pm
 
@@ -276,4 +276,4 @@ do_subtask_disk_uuid:
 	mov [edata.boot_disk_uuid], eax
 	
 	add sp, 512 + 16
-	ret
+	o32 ret

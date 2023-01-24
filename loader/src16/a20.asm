@@ -65,7 +65,7 @@ do_subtask_a20_line:
 	mov si, rodata.str_a20_done
 	call puts
 
-	ret
+	o32 ret
 
 
 
