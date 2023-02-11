@@ -35,7 +35,7 @@ BITS 16
 
 
 ;cdecl args:
-;	void* pre to conio params table
+;	void* ptr to conio params table
 __fill_conio_params:
 	mov eax, [esp + 4]
 	mov dword [eax + 0], data.output_use_screen

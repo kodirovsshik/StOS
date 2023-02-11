@@ -22,11 +22,11 @@
 ;✓	Go 32 bit mode
 ;✓		By this point, we should have already been using C++
 ;✓		Load the kernel at 0x100000
-;	Setup 64-bit environment
-;		Identity page mapping for usable memory pages
-;			plus [0x100000; ...) being mapped at -2GB:
-;				[0xFFFFFFFF80000000; ...) -> [0x100000; ...);
-;	Transfer the control to 64-bit environment
+;✓	Setup 64-bit environment
+;✓		Identity page mapping for usable memory pages
+;✓			plus [0x100000+; ...) being mapped at -2GB:
+;✓				[0xFFFFFFFF80000000; ...) -> [0x100000+; ...);
+;✓	Transfer the control to 64-bit environment
 
 
 ;Assumptions:

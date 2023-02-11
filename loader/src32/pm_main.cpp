@@ -34,6 +34,7 @@ struct alignas(8) edata_t
 {
 	uint8_t boot_disk_uuid[16];
 	uint64_t boot_partition_lba;
+	uint32_t free_paging_area;
 	uint32_t memory_map_addr;
 	uint16_t memory_map_size;
 	uint16_t output_buffer_index;
@@ -251,6 +252,7 @@ uint64_t pm_main()
 {
 	setup_paging_initial();
 	load_kernel();
+	edata.free_paging_area = paging_data.free_paging_area;
 	if (return_data.io_status != 0)
 		return_data.error = true;
 	return return_data.value;

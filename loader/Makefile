@@ -72,6 +72,6 @@ $(LOADER_BIN): $(LOADER_ELF)
 
 clean-sub-$(LOADER_DIR):
 	rm -rf $(LOADER_TMP)
-	rm -f $(LOADER_ELF) $(LOADER_BIN) $(LOADER_DISASM)
+	rm -f $(LOADER_ELF) $(LOADER_BIN)
 
 make-sub-$(LOADER_DIR): $(LOADER_BIN)

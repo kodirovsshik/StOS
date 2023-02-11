@@ -139,7 +139,7 @@ void try_fill_memory_table_e820()
 		if (regs.flags & EFLAGS_CARRY)
 			break;
 		if (entry.type != 1)
-			goto skip_current_entry; 
+			goto skip_current_entry;
 		//forgive me god for using goto,
 		//but it actually fits the program logic really well
 		if (regs.cx < 24)
