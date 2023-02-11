@@ -15,6 +15,7 @@ Invoke as:
 #include <iostream>
 #include <format>
 #include <filesystem>
+#include <charconv>
 
 
 using namespace std;
@@ -277,14 +278,15 @@ void read_sectors(FILE* fd, size_t sector, size_t count, void* buff)
 int main(int argc, char** argv)
 {
 	bool pause = false;
-	rassert(argc == 6 || (argc == 7 && (pause = strcmp(argv[6], "pause") == 0)), 1,
-		"%s: error: 5 arguments required", argv[0]);
+	rassert(argc == 7 || (argc == 8 && (pause = strcmp(argv[7], "pause") == 0)), 1,
+		"%s: error: 6 arguments required", argv[0]);
 	
 	string_view disk = argv[1];
 	string_view mount_point = argv[2];
 	string_view kernel_bin = argv[3];
 	string_view pbr_bin = argv[4];
 	string_view loader_bin = argv[5];
+	string_view bss_pages_str = argv[6];
 	string loop_device;
 	bool mounted = false;
 	bool err = false;
@@ -733,8 +735,22 @@ int main(int argc, char** argv)
 		invoke_shell(format("mkdir {}/StOS", mount_point));
 
 		invoke_shell(format("cp {} {}/StOS", kernel_bin, mount_point));
+
 		const uint32_t kernel_listing_sector = generate_stos_file_listing(kernel_bin);
 		patch_file(loader_bin, 4, &kernel_listing_sector, sizeof(kernel_listing_sector));
+
+		uint32_t kernel_bss_pages;
+		auto bss_pages_parse_result = from_chars(
+			bss_pages_str.data(),
+			bss_pages_str.data() + bss_pages_str.size(), 
+			// ^^^ who tf names their past-the-end pointer 'last' and not 'end'??
+			kernel_bss_pages,
+			16
+		);
+		rassert(bss_pages_parse_result.ec == std::errc{}, 1, 
+			"Failed to parse number: \"%s\"", bss_pages_str.data());
+		kernel_bss_pages = (kernel_bss_pages + 4095) / 4096;
+		patch_file(loader_bin, 8, &kernel_bss_pages, sizeof(kernel_bss_pages));
 
 		invoke_shell(format("cp {} {}/StOS", loader_bin, mount_point));
 		const uint32_t loader_listing_sector = generate_stos_file_listing(loader_bin);

@@ -1,5 +1,9 @@
 
 override KERNEL_ELF = $(shell echo $(KERNEL_BIN) | sed s/.bin/.elf/g)
+override GET_KERNEL_BSS_SIZE = \
+	$(shell objdump -h $(KERNEL_ELF) 2>/dev/null | \
+	grep .bss | sed s/[0-9]// | sed s/.bss// | sed s/\ \*// | awk '{print $$1}')
+#Violence is not the answer. Violence is the question, and the answer is yes.
 
 override KERNEL_SRC := $(KERNEL_DIR)/src
 override KERNEL_TMP := $(KERNEL_DIR)/tmp

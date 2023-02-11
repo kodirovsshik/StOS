@@ -31,7 +31,6 @@ gdt64:
 	db 0x92
 	db 0xCF
 	db 0x00
-.tss:
 	dd 0x00000068
 	dd 0x00C08900
 	dq 0
@@ -42,38 +41,9 @@ gdt64:
 
 
 
-idt_handlers:
-	times 13 dd 0
-	dd gp_handler
-	times 18 dd 0
-
-
-
-SECTION .data
-
-
-
-idtr64:
-	dw idt64.end - idt64
-	dd idt64
-	dd 0
-
-idt64:
-	times 32*16 db 0
-.end:
-
-
 
 SECTION .text
 
-
-
-gp_handler:
-BITS 64
-	mov rax, 0x0123456789ABCDEF
-	iret
-	hlt
-	jmp gp_handler
 
 
 BITS 32
@@ -87,7 +57,7 @@ go_lm:
 
 	mov ecx, 0xC0000080 ;EFER
 	rdmsr
-	or eax, 1 << 8 ;LME
+	or eax, (1 << 8) | (1 << 11) ;LME, NXE
 	wrmsr
 
 	mov eax, cr0
@@ -96,11 +66,7 @@ go_lm:
 
 	nop
 
-	lidt [idtr64]
 	lgdt [gdtr64]
-
-	mov eax, gdt64.tss - gdt64
-	ltr ax
 
 	mov eax, seg64_data
 	mov ds, eax
@@ -113,6 +79,13 @@ go_lm:
 
 BITS 64
 lm_bootstrap:
-	mov rax, 0xFFFFFFFF80000000
+	;System V x86-64 abi
+	;First argument (for kernel) passed in rdi
 	mov edi, edata
+
+	;Stack must be 16-byte aligned upon a function call
+	mov esp, 0x10000
+	
+	;Why is there no better way to do an absolute jump
+	mov rax, 0xFFFFFFFF80000000
 	jmp rax

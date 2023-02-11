@@ -52,6 +52,7 @@ $(LOADER_ELF16): $(LOADER_OBJ16) $(LOADER_DIR)/loader16.ld
 	$(OBJCOPY_TARGET) -w -L \* $@ $@
 	$(OBJCOPY_TARGET) --globalize-symbol=edata $@ $@
 	$(OBJCOPY_TARGET) --globalize-symbol=kernel_listing_sector $@ $@
+	$(OBJCOPY_TARGET) --globalize-symbol=kernel_bss_pages $@ $@
 	$(OBJCOPY_TARGET) --globalize-symbol=pbr_disk $@ $@
 	ndisasm -o 0x600 $@ > $@.disasm
 

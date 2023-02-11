@@ -90,9 +90,10 @@ static_assert(sizeof(page_map) == 4096);
 #define MMAP_WRITABLE (1 << 1)
 #define MMAP_WRITETHROUGH (1 << 3)
 #define MMAP_NOT_CACHABLE (1 << 4)
-#define MMAP_ATTRIBS_MASK 0xFFE
+#define MMAP_NOT_EXECUTABLE (uint64_t(1) << 63)
+#define MMAP_ATTRIBS_MASK 0x800000000000011Eu
 
-void mmap(uint64_t physical, uint64_t virtual_, uint16_t attribs = MMAP_WRITABLE)
+void mmap(uint64_t physical, uint64_t virtual_, uint64_t attribs = MMAP_WRITABLE)
 {
 	uint32_t current_address = paging_data.page_map_base;
 	for (int off = 39; off >= 21; off -= 9)
@@ -130,7 +131,7 @@ void setup_paging_initial()
 		mmap(4096 * i, 4096 * i);
 	//Video memory
 	for (int i = 160; i < 192; ++i)
-		mmap(4096 * i, 4096 * i, MMAP_WRITABLE | MMAP_WRITETHROUGH);
+		mmap(4096 * i, 4096 * i, MMAP_WRITABLE | MMAP_WRITETHROUGH | MMAP_NOT_EXECUTABLE);
 }
 
 uint32_t next_kernel_load_page()
@@ -153,6 +154,7 @@ uint32_t next_kernel_load_page()
 	return 0;
 }
 
+extern "C" uint32_t kernel_bss_pages;
 void load_kernel()
 {
 	uint64_t kernel_virtual_addr = 0xFFFFFFFF80000000u;
@@ -207,6 +209,7 @@ void load_kernel()
 	while (true)
 	{
 		new_page();
+
 		while (true)
 		{
 			if (sectors_count == 0 && !fetch())
@@ -220,55 +223,26 @@ void load_kernel()
 			if (return_data.io_status != 0)
 				return;
 		}
+
 		mmap(addr, kernel_virtual_addr);
+		kernel_virtual_addr += 4096;
+
 		if (sectors_count == 0)
 			break;
-
-		kernel_virtual_addr += 4096;
 
 		read(sectors_left_in_page);
 		if (return_data.io_status != 0)
 			return;
 
 	}
-}
 
-
-
-struct idt_entry
-{
-	uint16_t offset1;
-	uint16_t selector = 8;
-	uint8_t _reserved0 = 0;
-	uint8_t type : 4 = 0xF;
-	bool _reserved1 : 1 = 0;
-	uint8_t dbp : 2 = 0;
-	bool present : 1 = 0;
-	uint16_t offset2;
-	uint32_t offset3;
-	uint32_t _reserved2 = 0;
-};
-static_assert(sizeof(idt_entry) == 16);
-
-extern "C" idt_entry idt64[32];
-extern "C" uint32_t idt_handlers[32];
-void fill_idt()
-{
-	for (int i = 0; i < 32; ++i)
+	while (kernel_bss_pages --> 0)
 	{
-		auto& entry = idt64[i];
-		entry = idt_entry{};
-
-		uint32_t isr = idt_handlers[i];
-		if (isr == 0)
-			continue;
-
-		entry.present = 1;
-		entry.offset1 = (uint16_t)isr;
-		entry.offset2 = (uint16_t)(isr >> 16);
-		entry.offset3 = 0;
+		mmap(next_kernel_load_page(), kernel_virtual_addr);
+		kernel_virtual_addr += 4096;
 	}
 }
+
 
 
 
@@ -279,7 +253,6 @@ uint64_t pm_main()
 	load_kernel();
 	if (return_data.io_status != 0)
 		return_data.error = true;
-	fill_idt();
 	return return_data.value;
 }
 

@@ -224,7 +224,7 @@ vm-reburn: vm-clean
 	$(MAKE) vm-burn
 
 vm-burn: $(VM_DISK) $(BINARIES) $(UTILS)
-	sudo $(VM_PREPARATOR) $(VM_DISK) $(VM_MNT) $(KERNEL_BIN) $(PBR_BIN) $(LOADER_BIN)
+	sudo $(VM_PREPARATOR) $(VM_DISK) $(VM_MNT) $(KERNEL_BIN) $(PBR_BIN) $(LOADER_BIN) $(GET_KERNEL_BSS_SIZE)
 	$(call write_boot_record,$(PBR_BIN),"$(VM_DISK)",$(MiB))
 	sfdisk -A $(VM_DISK) 1 >/dev/null
 
