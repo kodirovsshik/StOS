@@ -99,7 +99,7 @@ override _QEMU_ARGS := $(QEMU_ARGS) -m $(VM_MEMORY_MiB) -drive file="$(VM_DISK)"
 QEMU32 := qemu-system-i386
 QEMU32_CPU := 486
 QEMU64 := qemu-system-x86_64
-QEMU64_CPU := 486,+lm,+pae
+QEMU64_CPU := Opteron_G1-v1
 
 override RUN_QEMU32 := $(QEMU32) $(_QEMU_ARGS) $(QEMU32_ARGS) -cpu $(QEMU32_CPU)
 override RUN_QEMU64 := $(QEMU64) $(_QEMU_ARGS) $(QEMU64_ARGS) -cpu $(QEMU64_CPU)
