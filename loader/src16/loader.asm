@@ -128,7 +128,7 @@ align 4, db 0xCC
 	kernel_listing_sector dd 0
 	kernel_bss_pages dd 0
 
-align 8, db 0xCC
+align 16, db 0xCC
 edata: ;data structure to be read by kernel
 	.boot_disk_uuid times 16 db 0
 	.boot_partition_lba dq 0
