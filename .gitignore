@@ -8,6 +8,9 @@ vm/
 #Neither any intermediate results
 *.elf*
 
+#Neither any logs
+*.log
+
 #I edit files with nano time to time
 *.swp
 

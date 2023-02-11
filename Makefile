@@ -104,6 +104,9 @@ QEMU64_CPU := 486,+lm,+pae
 override RUN_QEMU32 := $(QEMU32) $(_QEMU_ARGS) $(QEMU32_ARGS) -cpu $(QEMU32_CPU)
 override RUN_QEMU64 := $(QEMU64) $(_QEMU_ARGS) $(QEMU64_ARGS) -cpu $(QEMU64_CPU)
 
+#Customization point
+EMULATOR_LOG_FILE := emu.log
+
 override export MiB := 1048576
 
 
@@ -253,7 +256,7 @@ define qemu_debug
 endef
 define vm_debug
 	$(MAKE) vm-burn
-	$(1) $(DETACHED) ;\
+	$(1) >$(EMULATOR_LOG_FILE) 2>&1 & true ;\
 	gdb -x gdb/defs.gdb \
 		-x gdb/init.gdb \
 		-x $(2) \
