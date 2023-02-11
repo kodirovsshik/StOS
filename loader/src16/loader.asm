@@ -13,12 +13,6 @@
 ;		kb controller method
 ;✓		port ee method
 ;✓		port 92 method
-;	Find reasonable video mode with VBE and save it for the kernel
-;✓		Check for VBE 3.0 support
-;		Find compliant video modes (Supported, RBG, 24 bit or 32 bit)
-;		If no found, stop booting
-;		Pick largest video mode not exceeding 768 in height
-;		If no found, pick the one with smallest height
 ;✓	Read disk UUID
 ;✓	Setup protected mode environment
 ;✓		Basic temporary GDT with 32-bit code and data segments
@@ -63,6 +57,7 @@
 ;functions
 global halt
 global panic
+global panic2
 global cpanic
 
 ;variables
@@ -86,7 +81,6 @@ extern puts
 extern do_subtask_cpu
 extern do_subtask_memory
 extern do_subtask_a20_line
-extern do_subtask_vbe
 extern save_output_buffer
 extern setup_exception_handlers
 extern go_pm
@@ -148,14 +142,13 @@ loader_main:
 	nop
 
 .setup_memory_layout:
-	cli
 
 	xor ax, ax
 	mov ds, ax
 	mov es, ax
 
-	mov sp, ax
 	mov ss, ax
+	mov sp, ax
 
 	sti
 	cld
@@ -187,12 +180,12 @@ loader_main:
 
 .do_subtasks:
 	call do_subtask_cpu
+	push dword 0x200
+	popfd
 
 	call dword do_subtask_memory
 
 	call dword do_subtask_a20_line
-
-	call dword do_subtask_vbe
 
 	call dword do_subtask_disk_uuid
 
@@ -205,17 +198,39 @@ loader_main:
 	mov si, rodata.str_loader_end
 	;jmp panic
 
+
+
 ;si = str
 ;noreturn
 panic:
+	push word 1
+	jmp _panic
+
+
+
+;si = str1
+;di = str2
+;noreturn
+panic2:
+	push word 2
+	;jmp _panic
+
+_panic:
 	mov byte [data.output_use_screen], 1
 	sti
 	
 	push si
 	mov si, rodata.str_panic
 	call puts
-
 	pop si
+
+	call puts
+
+	pop ax
+	dec ax
+	jz halt
+
+	mov si, di
 	call puts
 
 	;jmp halt

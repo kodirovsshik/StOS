@@ -1,7 +1,6 @@
 
-extern panic
+extern panic2
 extern puts
-extern endl
 
 global do_subtask_cpu
 
@@ -29,7 +28,7 @@ do_subtask_cpu:
 	pop ax
 	and ax, 0xF000
 	cmp ax, 0xF000
-	je err_unsupported_cpu ;8086/80186 detected
+	je err_old_cpu ;8086/80186 detected
 
 ;Assume at least 80286
 	or cx, 0xF000
@@ -39,7 +38,7 @@ do_subtask_cpu:
 	pop ax
 	and ax, 0xF000
 	;I don't understand this one, why would all of them be 0 only on 80286?
-	jz err_unsupported_cpu ;80286 detected
+	jz err_old_cpu ;80286 detected
 
 ;Assume at least 80386 => 32 bit registers are present
 	pushfd
@@ -51,7 +50,7 @@ do_subtask_cpu:
 	pushfd
 	pop eax
 	cmp eax, ecx
-	je err_unsupported_cpu ;80386 detected
+	je err_old_cpu ;80386 detected
 
 	;Restore AC bit
 	push ecx
@@ -65,120 +64,110 @@ do_subtask_cpu:
 	pushfd
 	pop eax
 	cmp eax, ecx
-	je err_unsupported_cpu ;couldn't flip CPUID flag
+	je err_old_cpu ;couldn't flip CPUID flag
 
 ;CPUID present
 	mov eax, 0x80000000
 	cpuid
 	mov ebx, 0x80000001
 	cmp eax, ebx ;need extended page 1 for long mode
-	jb err_unsupported_cpu
+	jb err_old_cpu
 
 	mov eax, ebx
 	cpuid
-	test edx, 1 << 29 ;long mode bit
-	jz err_unsupported_cpu
 
-;Supported CPU detected, CPU discovery done
+	test edx, 1 << 29 ;long mode bit
+	jz err_old_cpu
+
+	mov si, rodata.str_nx
+	test edx, 1 << 20
+	jz err_cpu_feature_missing
+
+;Long mode present
+	mov eax, 1
+	cpuid
+
+	mov si, rodata.str_pae
+	test edx, 1 << 6
+	jz err_cpu_feature_missing
+
+	mov si, rodata.str_apic
+	test edx, 1 << 9
+	jz err_cpu_feature_missing
+
+	mov si, rodata.str_pge
+	test edx, 1 << 13
+	jz err_cpu_feature_missing
+
+	mov si, rodata.str_cmov
+	test edx, 1 << 15
+	jz err_cpu_feature_missing
+
+	mov si, rodata.str_mmx
+	test edx, 1 << 23
+	jz err_cpu_feature_missing
+
+	mov si, rodata.str_osfxsr
+	test edx, 1 << 24
+	jz err_cpu_feature_missing
+
+	mov si, rodata.str_sse2
+	test edx, 1 << 25 ;SSE
+	jz err_cpu_feature_missing
+	test edx, 1 << 26 ;SSE2
+	jz err_cpu_feature_missing
+
+	mov si, rodata.str_cmpxchg16b
+	test ecx, 1 << 13
+	;jz err_cpu_feature_missing
+
+
 .cleanup:
-	;Flags are all messed up by discovery algorithm
-	push dword 0x200
-	popfd ;IF=1
+	call restore_flags
 
 .check_done:
 	movzx esp, sp
 	movzx ebp, bp
 
-	call print_cpu_data_strings
 	ret
 
 
 
-print_cpu_data_strings:
-.setup:
-	sub sp, 52
-
-	mov di, sp
-	mov si, sp
-
-.get_manufacturer_string:
-	xor eax, eax
-	cpuid
-	mov eax, ebx
-	stosd
-	mov eax, edx
-	stosd
-	mov eax, ecx
-	stosd
-	mov eax, 10
-	stosd
-.print_manufacturer_string:
-	call puts
-
-.check_brand_string_present:
-	mov eax, 0x80000000
-	cpuid
-	cmp eax, 0x80000004
-	jb .ret
-
-.get_brand_string:
-	mov di, sp
-	mov si, sp
-
-	mov eax, 0x80000002
-	cpuid
-	stosd
-	mov eax, ebx
-	stosd
-	mov eax, ecx
-	stosd
-	mov eax, edx
-	stosd
-
-	mov eax, 0x80000003
-	cpuid
-	stosd
-	mov eax, ebx
-	stosd
-	mov eax, ecx
-	stosd
-	mov eax, edx
-	stosd
-
-	mov eax, 0x80000004
-	cpuid
-	stosd
-	mov eax, ebx
-	stosd
-	mov eax, ecx
-	stosd
-	mov eax, edx
-	stosd
-
-	xor eax, eax
-	stosd
-
-.unpad_brand_string: ;why do Intel pad their CPU brand strings with spaces
-	lodsb
-	cmp al, ' '
-	je .unpad_brand_string
-
-.print_brand_string:
-	dec si
-	call puts
-	call endl
-
-.ret:
-	add sp, 52
+;Flags are all messed up by discovery algorithm
+restore_flags:
+	push word 0x200
+	popf
 	ret
 
 
 
 ;noreturn
-err_unsupported_cpu:
-	push word 0x200
-	popf
-	mov si, .str
-	jmp panic
-.str:
-	db "Unsupported CPU detected, 64 bit support required", 0
+err_old_cpu:
+	mov si, rodata.str_64
+	;jmp err_cpu_feature_missing
+
+;noreturn
+;SI = err C string ptr
+err_cpu_feature_missing:
+	call restore_flags
+	
+	mov di, si
+	mov si, rodata.str_err
+	jmp panic2
+
+
+
+
+SECTION .rodata
+rodata:
+	.str_err: db "Unsupported CPU feature: ", 0
+	.str_64: db "64 bit mode", 0
+	.str_apic: db "APIC", 0
+	.str_cmov: db "CMOV", 0
+	.str_mmx: db "MMX", 0
+	.str_sse2: db "SSE2", 0
+	.str_osfxsr: db "OSFXSR", 0
+	.str_cmpxchg16b: db "CMPXCHG16B", 0
+	.str_pae: db "CR4.PAE", 0
+	.str_pge: db "CR4.PGE", 0
+	.str_nx: db "CR4.NX", 0
