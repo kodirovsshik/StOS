@@ -99,7 +99,9 @@ rodata:
 	.str_logo db 10, "StOS loader v1.0", 10, 0
 	.str_loader_end db "Error: loader end reached", 10, 0
 	.str_panic db 10, "BOOTLOADER PANIC:", 10, 0
+%ifndef NDEBUG
 	.str_buffer_saved db 10, "Output buffer dumped to LBA 0x780", 0
+%endif
 
 
 
@@ -238,12 +240,14 @@ _panic:
 
 ;noreturn
 halt:
+%ifndef NDEBUG
 	call save_output_buffer
 
 	mov byte [data.output_use_screen], 1
 
 	mov si, rodata.str_buffer_saved
 	call puts
+%endif
 
 	mov si, .str_halt
 	call puts

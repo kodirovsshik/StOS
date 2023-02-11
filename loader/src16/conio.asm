@@ -281,6 +281,7 @@ put32u:
 
 
 
+%ifndef NDEBUG
 save_output_buffer:
 	;64 KiB at 0x10000 are written to 128 sectors right before 1 MiB boundary
 	mov bx, [edata.output_buffer_index]
@@ -315,3 +316,4 @@ save_output_buffer:
 
 	add sp, 16
 	ret
+%endif

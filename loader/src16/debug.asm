@@ -7,13 +7,14 @@ extern halt
 
 
 
+%ifdef _DEBUG
 SECTION .rodata
 rodata:
 	.str_ud db 10, "#UD", 0
 	.str_ss db 10, "#SS", 0
 	.str_unknown_exception db 10, "UNKNOWN EXCEPTION", 0
 	.str_excp_ip db " GENERATED, IP = 0x", 0
-
+%endif
 
 
 SECTION .text
@@ -21,6 +22,7 @@ BITS 16
 
 
 
+%ifdef _DEBUG
 ud_handler:
 	mov si, rodata.str_ud
 	jmp common_exception_handler
@@ -46,14 +48,17 @@ common_exception_handler:
 	
 	mov word [bp], halt ;cry about it
 	iret
+%endif
 
 
 
 setup_exception_handlers:
+%ifdef _DEBUG
 	xor edi, edi
 	mov eax, unknown_exception_handler
 	mov cx, 8
 	rep stosd
 	mov dword [24], ud_handler
 	mov dword [0xC*4], ss_handler
+%endif
 	ret
