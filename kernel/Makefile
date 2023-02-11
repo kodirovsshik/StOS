@@ -8,7 +8,8 @@ override KERNEL_OBJS :=
 override KERNEL_OBJS += $(call find_objs_names,asm,.elf,$(KERNEL_SRC),$(KERNEL_TMP))
 override KERNEL_OBJS += $(call find_objs_names,cpp,64.elf,$(KERNEL_SRC),$(KERNEL_TMP))
 
-override KERNEL_CXX_ARGS := $(CXX_OTIME)
+override KERNEL_CXX_ARGS := $(CXX_OTIME) -std=c++20 -masm=intel -mabi=sysv -mno-red-zone -march=opteron
+
 
 override KERNEL_LAYOUT := $(KERNEL_TMP)
 
