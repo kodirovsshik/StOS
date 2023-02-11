@@ -51,7 +51,7 @@ CXX16_FOR_TARGET := $(CXX_FOR_TARGET) -m16
 override CXX_OTIME :=
 
 ifeq ($(DEBUG),true)
-override _CXX_ARGS += -Wall -Wextra -Werror -g -Og -D_DEBUG
+override _CXX_ARGS += -Wall -Wextra -Werror -g -O0 -D_DEBUG
 override _NASM_ARGS += -D_DEBUG
 else
 override _CXX_ARGS += -DNDEBUG
