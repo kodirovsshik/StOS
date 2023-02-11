@@ -31,3 +31,5 @@ $(KERNEL_BIN): $(KERNEL_DIR)/kernel.ld $(KERNEL_OBJS)
 clean-sub-$(KERNEL_DIR):
 	rm -rf $(KERNEL_TMP)
 	rm -f $(KERNEL_ELF) $(KERNEL_BIN)
+
+make-sub-$(KERNEL_DIR): $(KERNEL_BIN)
