@@ -19,11 +19,11 @@ global data.output_use_log
 global data.output_use_serial
 
 extern pbr_disk
+extern edata.output_buffer_index
 
 
 SECTION .data
 data:
-.output_log_ptr dw 0
 .output_use_screen db 1
 .output_use_log db 1
 .output_use_serial db 1
@@ -110,13 +110,14 @@ putc1:
 .put_log:
 	cmp al, 13
 	je .put_log.ret
-	mov bx, [data.output_log_ptr]
+	mov bx, [edata.output_buffer_index]
 	push ds
 	push word 0x1000
 	pop ds
 	mov [bx], al
 	pop ds
-	inc word [data.output_log_ptr]
+	inc bx
+	mov [edata.output_buffer_index], bx
 
 .put_log.ret:
 	ret
@@ -282,7 +283,7 @@ put32u:
 
 save_output_buffer:
 	;64 KiB at 0x10000 are written to 128 sectors right before 1 MiB boundary
-	mov bx, [data.output_log_ptr]
+	mov bx, [edata.output_buffer_index]
 
 	;Write terminating zero at the end of the buffer
 	push ds

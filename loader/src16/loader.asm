@@ -65,13 +65,12 @@ global edata.pbr_lba
 global edata.boot_signature
 global edata.memory_map_addr
 global edata.memory_map_size
-global edata.e820_ok
-global edata.vbe_modes_ptr
-global edata.vbe_modes_count
+global edata.output_buffer_index
 global pbr_disk
 global c_get_memory_map_addr
 global c_get_memory_map_size
 global kernel_listing_sector
+global kernel_bss_pages
 global edata
 
 ;functions
@@ -121,15 +120,17 @@ loader_begin:
 
 
 align 4, db 0xCC
-	kernel_listing_sector dd 0
-%if kernel_listing_sector - loader_begin != 4
+%if $ - loader_begin != 4
 %error Imported data misplacement
 %endif
+	kernel_listing_sector dd 0
+	kernel_bss_pages dd 0
 
 align 8, db 0xCC
 edata: ;data structure to be read by kernel
 	.boot_disk_uuid times 16 db 0
 	.boot_partition_lba dq 0
+	.free_paging_area dd 0
 	.memory_map_addr dd 0
 	.memory_map_size dw 0
 	.output_buffer_index dw 0
