@@ -1,1 +1,7 @@
 Implement A20 enable via keyboard controller
+
+Review if loader/src16/include is needed at all
+
+make qemu-debug64 actually debug
+
+fix random hang in loader

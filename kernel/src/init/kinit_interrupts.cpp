@@ -14,7 +14,7 @@ void initialize_interrupt_handling()
 	idt[0x0E].fill_trap_entry((void*)page_fault_handler);
 	
 	extern idtr_t idtr;
-	asm volatile("lidt [%[idtr]]" :: [idtr] "m" (idtr));
+	asm volatile("lidt %[idtr]" :: [idtr] "m" (idtr));
 }
 
 

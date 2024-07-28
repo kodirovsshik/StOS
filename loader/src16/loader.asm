@@ -142,7 +142,7 @@ edata: ;data structure to be read by kernel
 
 
 loader_main:
-	nop
+	cli
 
 .setup_memory_layout:
 
@@ -182,9 +182,8 @@ loader_main:
 	mov byte [data.output_use_screen], 0
 
 .do_subtasks:
+
 	call do_subtask_cpu
-	push dword 0x200
-	popfd
 
 	call dword do_subtask_memory
 
@@ -195,11 +194,11 @@ loader_main:
 	call dword go_pm
 
 
-
-
 .loader_end:
 	mov si, rodata.str_loader_end
 	;jmp panic
+
+
 
 
 
@@ -237,6 +236,8 @@ _panic:
 	call puts
 
 	;jmp halt
+
+
 
 ;noreturn
 halt:

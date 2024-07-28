@@ -135,15 +135,11 @@ _check_a20:
 	mov ax, 0xFF00
 	mov es, ax
 
-	wbinvd
-	mov dword [es:0x1500], 0x55AA0000
-	wbinvd
-	mov dword [ds:0x0500], 0xAA550000
+	mov dword [es:0x1504], 0x55AA0000
+	mov dword [ds:0x0504], 0xAA550000
 
-	wbinvd
-	mov eax, [es:0x1500]
-	wbinvd
-	sub eax, [ds:0x0500]
+	mov eax, [es:0x1504]
+	sub eax, [ds:0x0504]
 
 	mov es, ax
 	ret

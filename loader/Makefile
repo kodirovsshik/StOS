@@ -21,7 +21,7 @@ override LOADER_OBJ32 += $(call find_objs_names,cpp,32.elf,$(LOADER_SRC32),$(LOA
 
 override GNU_LD_RWX_SEGMENT_WARNING = \
 $(shell (echo "SECTIONS{}" | \
-	$(LINKER_FOR_TARGET) /dev/null -T /dev/stdin -nostartfiles \
+	$(LINK32) /dev/null -T /dev/stdin -nostartfiles \
 	-Wl,--no-warn-rwx-segment 2>/dev/null -o /dev/zero) \
 && echo ,--no-warn-rwx-segment || echo)
 
@@ -48,7 +48,7 @@ $(LOADER_TMP)/%.cpp32.elf: $(LOADER_SRC32)/%.cpp | $(LOADER_LAYOUT)
 	$(CXX32) -std=c++20 $< -o $@ $(call get_osize,$(CXX32)) $(LOADER_CXX_ARGS)
 
 $(LOADER_ELF16): $(LOADER_OBJ16) $(LOADER_DIR)/loader16.ld
-	$(LINKER_FOR_TARGET) -r -o $@ $(LOADER_OBJ16) -T $(LOADER_DIR)/loader16.ld
+	$(LINK32) -r -o $@ $(LOADER_OBJ16) -T $(LOADER_DIR)/loader16.ld
 	$(OBJCOPY_TARGET) -w -L \* $@ $@
 	$(OBJCOPY_TARGET) --globalize-symbol=edata $@ $@
 	$(OBJCOPY_TARGET) --globalize-symbol=kernel_listing_sector $@ $@
@@ -57,13 +57,13 @@ $(LOADER_ELF16): $(LOADER_OBJ16) $(LOADER_DIR)/loader16.ld
 	ndisasm -o 0x600 $@ > $@.disasm
 
 $(LOADER_ELF32): $(LOADER_OBJ32)
-	$(LINKER_FOR_TARGET) -Wl,-melf_i386 -r -o $@ $(LOADER_OBJ32)
+	$(LINK32) -Wl,-melf_i386 -r -o $@ $(LOADER_OBJ32)
 	$(OBJCOPY_TARGET) -w -L \* $@ $@
 	$(OBJCOPY_TARGET) --globalize-symbol=go_pm $@ $@
 	ndisasm -b 32 $@ > $@.disasm
 
 $(LOADER_ELF): $(LOADER_ELF16) $(LOADER_ELF32) $(LOADER_DIR)/loader.ld
-	$(LINKER_FOR_TARGET) $(LOADER_ELF16) $(LOADER_ELF32) -o $(LOADER_ELF) \
+	$(LINK32) $(LOADER_ELF16) $(LOADER_ELF32) -o $(LOADER_ELF) \
 		-T $(LOADER_DIR)/loader.ld -Wl$(GNU_LD_RWX_SEGMENT_WARNING),--build-id=none
 
 $(LOADER_BIN): $(LOADER_ELF)

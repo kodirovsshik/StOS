@@ -12,8 +12,8 @@ endef
 endif
 
 
-#Invoke as follows: find_objs_names (src excention) (appendix) (src dir) (tmp dir)
-#Finds all files with extention (src excention) in (src dir)
+#Invoke as follows: find_objs_names (src extention) (appendix) (src dir) (tmp dir)
+#Finds all files with extention (src extention) in (src dir)
 #Returns list of files of the form (tmp dir)/filename(appendix)
 define find_objs_names
 $(patsubst \
@@ -39,42 +39,70 @@ override SILENT := >/dev/null
 override ESILENT := 2>/dev/null
 override DETACHED := $(SILENT) $(ESILENT) & true
 
-override _CXX_ARGS += -Wno-unused-function
-override _NASM_ARGS += -Wall -Werror -Wno-unknown-warning -Ox
 
-#Customization points (compilers for specific targets)
-CXX_FOR_TARGET := x86_64-pc-elf-g++
-CXX64_FOR_TARGET := $(CXX_FOR_TARGET) -m64 -mcmodel=large
-CXX32_FOR_TARGET := $(CXX_FOR_TARGET) -m32
-CXX16_FOR_TARGET := $(CXX_FOR_TARGET) -m16
 
-override CXX_OTIME :=
+override TARGET_LINKER_ARGS += -Wl,--no-pie
+cxxpreset := clang
 
-ifeq ($(DEBUG),true)
-override _CXX_ARGS += -Wall -Wextra -Werror -g -O0 -D_DEBUG
-override _NASM_ARGS += -D_DEBUG
+ifeq ($(cxxpreset),clang)
+TARGET_CXX = clang++
+#why tf does bare metal target triplet have to break freestanding library??
+#why should they be different in the first place??
+TARGET_CXX64 := $(TARGET_CXX) #-target x86_64-pc-elf
+TARGET_CXX32 := $(TARGET_CXX) #-target i386-pc-elf
+TARGET_LINKER64 := $(TARGET_CXX64)
+TARGET_LINKER32 := $(TARGET_CXX32) -m32
+override TARGET_LINKER_ARGS += -fuse-ld=lld
+
+else ifeq ($(cxxpreset),gcc)
+TARGET_CXX := x86_64-pc-elf-g++
+TARGET_CXX64 := $(TARGET_CXX)
+TARGET_CXX32 := $(TARGET_CXX)
+TARGET_LINKER64 := $(TARGET_CXX64)
+TARGET_LINKER32 := $(TARGET_CXX32)
+override TARGET_LINKER_ARGS +=
+
 else
-override _CXX_ARGS += -DNDEBUG
-override _NASM_ARGS += -DNDEBUG
-override CXX_OTIME += -Ofast
+$(error Unknown C++ compiler preset in "cxxpreset", valid values are: "gcc", "clang" (default))
 endif
 
-override _CXX_FOR_TARGET_ARGS := -c $(_CXX_ARGS) -ffreestanding -fno-exceptions -fno-rtti
-override _LINKER_FOR_TARGET_ARGS := -nostdlib
+#Customization points (TARGET_CXXnn_ARGS)
+override TARGET_CXX16 := $(TARGET_CXX32) $(TARGET_CXX16_ARGS) -m16
+override TARGET_CXX32 := $(TARGET_CXX32) $(TARGET_CXX32_ARGS) -m32
+override TARGET_CXX64 := $(TARGET_CXX64) $(TARGET_CXX64_ARGS) -m64 -mcmodel=kernel
+#TODO: consider -mcmodel=kernel and -mlarge-data-threshold=65536
 
-#Customization points (args for different compilers)
-override export CXX64 := $(CXX64_FOR_TARGET) $(CXX_FOR_TARGET_ARGS) $(CXX64_FOR_TARGET_ARGS) $(_CXX_FOR_TARGET_ARGS)
-override export CXX32 := $(CXX32_FOR_TARGET) $(CXX_FOR_TARGET_ARGS) $(CXX32_FOR_TARGET_ARGS) $(_CXX_FOR_TARGET_ARGS)
-override export CXX16 := $(CXX16_FOR_TARGET) $(CXX_FOR_TARGET_ARGS) $(CXX16_FOR_TARGET_ARGS) $(_CXX_FOR_TARGET_ARGS)
 
-#Customization point (args for linker)
-override export LINKER_FOR_TARGET := $(CXX_FOR_TARGET) $(LINKER_FOR_TARGET_ARGS) $(_LINKER_FOR_TARGET_ARGS)
 
-override export _CXX := $(CXX) $(CXX_OTIME) $(_CXX_ARGS)
+override CXX_ARGS +=
+override TARGET_CXX_ARGS += -Wno-unused-function
+override NASM_ARGS += -Wall -Werror -Wno-unknown-warning -Ox
 
-#Customization points (custom NASM and args)
+ifeq ($(DEBUG),true)
+override CXX_ARGS += -Wall -Wextra -Werror -g -O0 -D_DEBUG
+override NASM_ARGS += -D_DEBUG
+else
+override CXX_ARGS += -Ofast -DNDEBUG
+override NASM_ARGS += -DNDEBUG
+endif
+
+#Customization points (TARGET_CXX_ARGS)
+override TARGET_CXX_ARGS += $(CXX_ARGS) -c -ffreestanding -fno-exceptions -fno-rtti -fno-pie -fno-pic
+#Customization point (TARGET_LINKER_ARGS)
+override TARGET_LINKER_ARGS += -nostdlib -static -lgcc
+
+override export CXX64 := $(TARGET_CXX64) $(TARGET_CXX_ARGS)
+override export CXX32 := $(TARGET_CXX32) $(TARGET_CXX_ARGS)
+override export CXX16 := $(TARGET_CXX16) $(TARGET_CXX_ARGS)
+
+override export LINK64 := $(TARGET_LINKER64) $(TARGET_LINKER_ARGS)
+override export LINK32 := $(TARGET_LINKER32) $(TARGET_LINKER_ARGS)
+
+override export _CXX := $(CXX) $(CXX_ARGS)
+
+#Customization points (NASM and NASM_ARGS)
 NASM := nasm
-override NASM := $(NASM) $(NASM_ARGS) $(_NASM_ARGS)
+override NASM := $(NASM) $(NASM_ARGS)
 ifeq ($(DEBUG),true)
 override NASMD := $(NASM) -gdwarf
 else
@@ -99,7 +127,7 @@ override _QEMU_ARGS := $(QEMU_ARGS) -m $(VM_MEMORY_MiB) -drive file="$(VM_DISK)"
 QEMU32 := qemu-system-i386
 QEMU32_CPU := 486
 QEMU64 := qemu-system-x86_64
-QEMU64_CPU := Opteron_G1-v1
+QEMU64_CPU := Opteron_G2-v1
 
 override RUN_QEMU32 := $(QEMU32) $(_QEMU_ARGS) $(QEMU32_ARGS) -cpu $(QEMU32_CPU)
 override RUN_QEMU64 := $(QEMU64) $(_QEMU_ARGS) $(QEMU64_ARGS) -cpu $(QEMU64_CPU)
@@ -191,13 +219,14 @@ everything: binaries utils
 
 
 
-.PHONY: clean clean-binaries clean-utils wipe
+.PHONY: clean clean-binaries clean-utils wipe clear
 
 clean-binaries: $(patsubst %,clean-sub-%,$(BINARIES_DIRS))
 
 clean-utils: $(patsubst %,clean-sub-%,$(UTILS_DIRS))
 
 clean: clean-binaries clean-utils
+clear: clean
 
 wipe: clean vm-clean
 

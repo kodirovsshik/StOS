@@ -13,6 +13,7 @@ override KERNEL_OBJS += $(call find_objs_names,asm,.elf,$(KERNEL_SRC),$(KERNEL_T
 override KERNEL_OBJS += $(call find_objs_names,cpp,64.elf,$(KERNEL_SRC),$(KERNEL_TMP))
 
 override KERNEL_CXX_ARGS := $(CXX_OTIME) -std=c++20 -masm=intel -mabi=sysv -mno-red-zone -march=opteron
+#TODO: recomsider mabi and march
 
 override KERNEL_HEADERS := $(shell find $(KERNEL_DIR)/include -type f -name \*.h\*)
 
@@ -30,7 +31,7 @@ $(KERNEL_TMP)/%.cpp64.elf: $(KERNEL_SRC)/%.cpp $(KERNEL_HEADERS) | $(KERNEL_LAYO
 	$(CXX64) $< -o $@ $(KERNEL_CXX_ARGS) -I$(KERNEL_DIR)/include
 
 $(KERNEL_BIN): $(KERNEL_DIR)/kernel.ld $(KERNEL_OBJS)
-	$(LINKER_FOR_TARGET) $(KERNEL_OBJS) -o $(KERNEL_ELF) -T $(KERNEL_DIR)/kernel.ld
+	$(LINK64) $(KERNEL_OBJS) -o $(KERNEL_ELF) -T $(KERNEL_DIR)/kernel.ld
 	$(OBJCOPY_TARGET) -O binary $(KERNEL_ELF) $@
 	chmod a-x $@ $(KERNEL_ELF) $(KERNEL_BIN)
 

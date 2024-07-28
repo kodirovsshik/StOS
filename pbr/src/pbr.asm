@@ -50,9 +50,11 @@ start:
 	mov sp, 0x7C00
 	sti
 
-;Save partition beginning for the loader
+;Save partition first absolute sector for the loader && later use
+;assumes SI points to MBR entry for said partition
+%define PARTITION_FIRST_SECTOR_ADDR 0x5F8
 	cld
-	mov di, 0x5F8
+	mov di, PARTITION_FIRST_SECTOR_ADDR
 	add si, 8
 	times 2 movsw
 	xor ax, ax
@@ -60,7 +62,7 @@ start:
 
 ;Read loader sector listing into 0x7E00 (next "memory sector")
 	mov bx, loader_relative_sector
-	call lba_store_relative_sector_number
+	call store_lba_sector_number_from_partition_relative_sector
 
 	mov ah, 0x42
 	mov si, lba
@@ -84,7 +86,7 @@ start:
 
 ;copy partition sector number into lba
 
-	call lba_store_relative_sector_number
+	call store_lba_sector_number_from_partition_relative_sector
 
 	mov si, lba
 	mov ah, 0x42
@@ -108,8 +110,8 @@ start:
 
 
 ;bx = ptr to 4 byte partition relative sector number
-lba_store_relative_sector_number:
-	mov si, 0x5F8
+store_lba_sector_number_from_partition_relative_sector:
+	mov si, PARTITION_FIRST_SECTOR_ADDR
 	mov di, lba.first_sector
 	mov cx, 4
 	rep movsw
@@ -121,10 +123,8 @@ lba_store_relative_sector_number:
 
 	mov ax, [bx + 2]
 	adc word [di + 2], ax
-
-	mov ax, 0
-	adc word [di + 4], ax
-	adc word [di + 6], ax
+	adc word [di + 4], cx
+	adc word [di + 6], cx
 	ret
 
 

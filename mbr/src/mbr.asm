@@ -24,7 +24,7 @@ start:
     mov si, sp
 
     sti
-    ;preserve for plug & play
+    ;DI is supposed to store some plug & play data ptr, save for later use
     push di
 
     mov es, ax
@@ -35,7 +35,6 @@ start:
     rep movsw
     jmp 0x0000:.relocated
 .relocated:
-
 
     mov bx, partition_table - 16
     mov cx, 4
@@ -59,7 +58,7 @@ read_loop:
     test ah, ah
     jnz read_error
 
-    pop di
+    pop di ;PnP ptr
     mov bp, bx
     mov si, bx
     xor ax, ax

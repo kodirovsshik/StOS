@@ -108,13 +108,13 @@ void fill_memory_table_fallback()
 		entry.type = entry.flags = 1;
 	};
 
-	memory_map_addr = (memory_map_entry_t*)c_heap_get_ptr();
+	memory_map_addr = (memory_map_entry_t*)heap_get_ptr();
 
 	insert_memory_table_entry(0, memory_at_0);
 	insert_memory_table_entry(MiB, memory_at_1m);
 	insert_memory_table_entry(16 * MiB, memory_at_16m);
 
-	c_heap_set_ptr(memory_map_addr + memory_map_size);
+	heap_set_ptr(memory_map_addr + memory_map_size);
 }
 void try_fill_memory_table_e820()
 {
@@ -123,7 +123,7 @@ void try_fill_memory_table_e820()
 	regs.di = ptr_cast(uint16_t, &entry);
 	uint32_t index = 0;
 
-	memory_map_addr = (memory_map_entry_t*)c_heap_get_ptr();
+	memory_map_addr = (memory_map_entry_t*)heap_get_ptr();
 
 	while (true)
 	{
@@ -163,7 +163,7 @@ skip_current_entry:
 			break;
 	}
 
-	c_heap_set_ptr(memory_map_addr + memory_map_size);
+	heap_set_ptr(memory_map_addr + memory_map_size);
 }
 void get_upper_memory_data_e881(uint32_t& at1m, uint64_t& at16m)
 {

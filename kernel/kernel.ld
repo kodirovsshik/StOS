@@ -89,5 +89,5 @@ SECTIONS
 	PROVIDE(_kernel_image_end = .);
 	
 	
-   /DISCARD/ 0 : { *(.note*) *(.gnu_debuglink) *(.gnu.lto_*) } 
+   /DISCARD/ 0 : { *(.comment*) *(.note*) *(.gnu_debuglink) *(.gnu.lto_*) } 
 }

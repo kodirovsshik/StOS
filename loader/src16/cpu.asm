@@ -12,7 +12,7 @@ BITS 16
 
 do_subtask_cpu:
 ;Perform CPU discovery with Intel's algorithm
-;The CPU must support long mode
+;The CPU must support long mode + common CPUID flags (noteably CMPXCHG16B)
 ;If unsuitable CPU is detected, panic and don't return
 
 	;jmp .check_done ;Uncomment to skip CPU discovery
@@ -64,7 +64,7 @@ do_subtask_cpu:
 	pushfd
 	pop eax
 	cmp eax, ecx
-	je err_old_cpu ;couldn't flip CPUID flag
+	je err_old_cpu ;no CPUID => unsuitable CPU
 
 ;CPUID present
 	mov eax, 0x80000000
@@ -119,24 +119,14 @@ do_subtask_cpu:
 
 	mov si, rodata.str_cmpxchg16b
 	test ecx, 1 << 13
-	;jz err_cpu_feature_missing
-
-
-.cleanup:
-	call restore_flags
+	jz err_cpu_feature_missing
 
 .check_done:
 	movzx esp, sp
 	movzx ebp, bp
 
-	ret
-
-
-
-;Flags are all messed up by discovery algorithm
-restore_flags:
-	push word 0x200
-	popf
+	push dword 0x200
+	popfd
 	ret
 
 
@@ -149,11 +139,12 @@ err_old_cpu:
 ;noreturn
 ;SI = err C string ptr
 err_cpu_feature_missing:
-	call restore_flags
-	
+	push word 0x200
+	popf
 	mov di, si
 	mov si, rodata.str_err
 	jmp panic2
+
 
 
 
