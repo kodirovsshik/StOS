@@ -46,12 +46,14 @@ cxxpreset := clang
 
 ifeq ($(cxxpreset),clang)
 TARGET_CXX = clang++
+override clang := $(TARGET_CXX) -stdlib=libc++
+override CXX_ARGS += -D_LIBCPP_HAS_NO_THREADS
 #why tf does bare metal target triplet have to break freestanding library??
 #why should they be different in the first place??
-TARGET_CXX64 := $(TARGET_CXX) #-target x86_64-pc-elf
-TARGET_CXX32 := $(TARGET_CXX) #-target i386-pc-elf
-TARGET_LINKER64 := $(TARGET_CXX64)
-TARGET_LINKER32 := $(TARGET_CXX32) -m32
+TARGET_CXX64 := $(clang) #-target x86_64-pc-elf
+TARGET_CXX32 := $(clang) #-target i386-pc-elf
+TARGET_LINKER64 := $(clang)
+TARGET_LINKER32 := $(clang) -m32
 override TARGET_LINKER_ARGS += -fuse-ld=lld
 
 else ifeq ($(cxxpreset),gcc)
