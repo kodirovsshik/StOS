@@ -41,8 +41,8 @@ struct alignas(8) edata_t
 };
 extern "C" edata_t edata;
 
-uint8_t disk_read(uint64_t lba, uint8_t count, void* ptr, uint8_t disk = 0xFF);
-uint8_t boot_partition_read(uint32_t sector, uint8_t count, void* ptr);
+uint8_t read_from_disk(uint64_t lba, uint8_t count, void* ptr, uint8_t disk = 0xFF);
+uint8_t read_from_boot_partition(uint32_t sector, uint8_t count, void* ptr);
 
 extern "C" uint32_t kernel_listing_sector;
 
@@ -171,7 +171,7 @@ void load_kernel()
 	uint8_t sectors_count = 0;
 	auto read = [&](uint8_t sectors)
 	{
-		boot_partition_read(sector, sectors, (void*)addr);
+		read_from_boot_partition(sector, sectors, (void*)addr);
 		sectors_left_in_page -= sectors;
 		sectors_count -= sectors;
 		addr += sectors * 512;
@@ -183,7 +183,7 @@ void load_kernel()
 	uint8_t listing_index = arr_size(listing.sectors);
 	auto update_listing = [&]
 	{
-		boot_partition_read(listing_next_sector, 1, &listing);
+		read_from_boot_partition(listing_next_sector, 1, &listing);
 		listing_index = 0;
 		listing_next_sector = listing.next;
 	};
@@ -259,15 +259,15 @@ uint64_t pm_main()
 }
 
 
-uint8_t boot_partition_read(uint32_t sector, uint8_t count, void* ptr)
+uint8_t read_from_boot_partition(uint32_t sector, uint8_t count, void* ptr)
 {
 	return_data.last_read_sector = sector;
 	return_data.last_read_size = count;
-	return disk_read(edata.boot_partition_lba + sector, count, ptr);
+	return read_from_disk(edata.boot_partition_lba + sector, count, ptr);
 }
 
 extern "C" uint8_t pbr_disk;
-uint8_t disk_read(uint64_t lba, uint8_t count, void* ptr, uint8_t disk)
+uint8_t read_from_disk(uint64_t lba, uint8_t count, void* ptr, uint8_t disk)
 {
 	if (disk == 0xFF)
 		disk = pbr_disk;

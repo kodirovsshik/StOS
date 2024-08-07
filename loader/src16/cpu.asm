@@ -15,7 +15,10 @@ do_subtask_cpu:
 ;The CPU must support long mode + common CPUID flags (noteably CMPXCHG16B)
 ;If unsuitable CPU is detected, panic and don't return
 
-	;jmp .check_done ;Uncomment to skip CPU discovery
+%ifdef _DEBUG
+	jmp .check_done ;Uncomment to skip CPU discovery
+%endif
+
 	cli
 ;Assume at least 8086
 	pushf

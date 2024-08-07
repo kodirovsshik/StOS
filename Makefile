@@ -45,6 +45,7 @@ override TARGET_LINKER_ARGS += -Wl,--no-pie
 cxxpreset := clang
 
 ifeq ($(cxxpreset),clang)
+CXX = clang++
 TARGET_CXX = clang++
 override clang := $(TARGET_CXX) -stdlib=libc++
 override CXX_ARGS += -D_LIBCPP_HAS_NO_THREADS
@@ -57,6 +58,7 @@ TARGET_LINKER32 := $(clang) -m32
 override TARGET_LINKER_ARGS += -fuse-ld=lld
 
 else ifeq ($(cxxpreset),gcc)
+CXX = GCC
 TARGET_CXX := x86_64-pc-elf-g++
 TARGET_CXX64 := $(TARGET_CXX)
 TARGET_CXX32 := $(TARGET_CXX)
@@ -76,10 +78,6 @@ override TARGET_CXX64 := $(TARGET_CXX64) $(TARGET_CXX64_ARGS) -m64 -mcmodel=kern
 
 
 
-override CXX_ARGS +=
-override TARGET_CXX_ARGS += -Wno-unused-function
-override NASM_ARGS += -Wall -Werror -Wno-unknown-warning -Ox
-
 ifeq ($(DEBUG),true)
 override CXX_ARGS += -Wall -Wextra -Werror -g -O0 -D_DEBUG
 override NASM_ARGS += -D_DEBUG
@@ -88,8 +86,12 @@ override CXX_ARGS += -Ofast -DNDEBUG
 override NASM_ARGS += -DNDEBUG
 endif
 
+override CXX_ARGS +=
+override TARGET_CXX_ARGS += -Wno-unused-function
+override NASM_ARGS += -Wall -Werror -Wno-unknown-warning -Ox
+
 #Customization points (TARGET_CXX_ARGS)
-override TARGET_CXX_ARGS += $(CXX_ARGS) -c -ffreestanding -fno-exceptions -fno-rtti -fno-pie -fno-pic
+override TARGET_CXX_ARGS := $(CXX_ARGS) $(TARGET_CXX_ARGS) -c -ffreestanding -fno-exceptions -fno-rtti -fno-pie -fno-pic
 #Customization point (TARGET_LINKER_ARGS)
 override TARGET_LINKER_ARGS += -nostdlib -static -lgcc
 

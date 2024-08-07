@@ -46,7 +46,7 @@ common_exception_handler:
 	movzx ax, [bp]
 	call put32x
 	
-	mov word [bp], halt ;cry about it
+	mov word [bp], halt ;I'm gonna replace the return address right on the stack, cry about it
 	iret
 %endif
 
