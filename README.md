@@ -9,3 +9,7 @@ apt packages for building:
 apt packages for running:
 
     apt install qemu-system-x86
+    
+# Obsoleted
+
+Obsoleted due to improperly handled rising complexity
